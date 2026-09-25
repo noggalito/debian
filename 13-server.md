@@ -6,6 +6,8 @@ Este documento describe las acciones necesarias para dejar listo un sistema Debi
 
 ## a. Historial de cambios
 
+- [0.8] – 2026-09-24
+  - Cambio de la URL del manual y actualización de las URL de las plantillas
 - [0.7] – 2026-09-13
   - Nueva §9.6 con la restricción del origen a los rangos de un proxy de borde o CDN
   - Nueva §10.5 sobre los límites del modelo de baneo por IP frente a campañas distribuidas
@@ -39,7 +41,7 @@ Este documento describe las acciones necesarias para dejar listo un sistema Debi
 
 ## c. Requerimientos previos
 
-- Llave SSH Ed25519 para el punto "4.2 Copia de la llave pública del administrador". Manual para generarla disponible [aquí](https://github.com/noggalito/manuales/blob/main/ssh-ed25519.md)
+- Llave SSH Ed25519 para el punto "4.2 Copia de la llave pública del administrador". Manual para generarla disponible [aquí](https://github.com/noggalito/llave-ssh)
 - Una cuenta de correo electrónico (a veces con contraseña por aplicación) desde donde se enviarán las notificaciones del servidor
 
 ---
@@ -764,7 +766,7 @@ sudo systemctl enable --now ssh
 
 #### 4.2 Copia de la llave pública del administrador
 
-Se requiere contar con una llave SSH Ed25519, en caso de no tenerla se puede acceder al manual [aquí](https://github.com/noggalito/manuales/blob/main/ssh-ed25519.md). La variable `$MINOMBREDELLAVE` se define en el manual citado en la línea anterior; en caso de no seguir ese manual, se la debe definir ahora antes de seguir. Desde el equipo del administrador (no desde el servidor), copiar la llave pública al servidor:
+Se requiere contar con una llave SSH Ed25519, en caso de no tenerla se puede acceder al manual [aquí](https://github.com/noggalito/llave-ssh). La variable `$MINOMBREDELLAVE` se define en el manual citado en la línea anterior; en caso de no seguir ese manual, se la debe definir ahora antes de seguir. Desde el equipo del administrador (no desde el servidor), copiar la llave pública al servidor:
 
 ```bash
 ssh-copy-id -i ~/.ssh/${MINOMBREDELLAVE}.pub usuario@servidor
@@ -1839,9 +1841,12 @@ Host miservidor
     Port $MIPUERTO
     User $MIUSUARIO
     IdentityFile ~/.ssh/<llave>
+    IdentitiesOnly yes
 ```
 
 A partir de ese momento, `ssh miservidor` reemplaza a `ssh -p $MIPUERTO $MIUSUARIO@<ip.del.servidor>`.
+
+> GNOME Keyring anuncia las claves de `~/.ssh/*.pub` y puede responder `agent refused operation` si no logra mostrar el diálogo de passphrase. Aunque el bloque indique `IdentityFile`, ssh le pide la firma al agente y no vuelve a intentar con el archivo; `IdentityAgent none` lo evita.
 
 ### 9. Firewall (UFW)
 
@@ -1949,6 +1954,7 @@ sudo ufw delete <numero o regla literal>
 
 ```bash
 sudo ufw enable
+sudo systemctl enable --now ufw
 ```
 
 UFW advierte: *"Command may disrupt existing ssh connections. Proceed with operation (y|n)?"*. Aquí es cuando importa que la regla de SSH esté correctamente configurada. Confirmar `y`.
@@ -3500,8 +3506,7 @@ Verificación específica de servicios introducidos en el manual hasta ahora:
 
 ```bash
 for svc in ssh chrony fail2ban ufw apparmor unattended-upgrades; do
-    printf "%-25s " "$svc"
-    systemctl is-active "$svc" 2>/dev/null || echo "no activo"
+    printf "%-25s %s\n" "$svc" "$(systemctl is-active "$svc" 2>/dev/null)"
 done
 ```
 
@@ -3974,13 +3979,13 @@ A partir de aquí, cada manual que extiende esta base añade sus propias capas: 
 
 ### Anexo A — Índice consolidado de plantillas
 
-Este manual usa plantillas alojadas en el repositorio público <https://github.com/noggalito/manuales/> que se descargan con `wget` y se sustituyen variables con `sed` durante la lectura. Esa estructura modular evita repetir bloques largos de configuración dentro del propio manual y facilita mantenerlas: si una plantilla cambia, basta con actualizarla en el repositorio sin tocar el documento.
+Este manual usa plantillas alojadas en el repositorio público <https://github.com/noggalito/debian/tree/main/assets/13> que se descargan con `wget` y se sustituyen variables con `sed` durante la lectura. Esa estructura modular evita repetir bloques largos de configuración dentro del propio manual y facilita mantenerlas: si una plantilla cambia, basta con actualizarla en el repositorio sin tocar el documento.
 
 Este anexo concentra en un solo lugar la lista completa de plantillas referenciadas, su ruta de destino en el sistema, la sección del manual donde se aplican, y las variables que cada una requiere. Sirve como mapa rápido cuando se necesita recordar qué plantilla corresponde a qué archivo, especialmente útil al revisar un servidor desplegado tiempo atrás.
 
 #### A.1 Convenciones del sistema de plantillas
 
-Las plantillas están en el repositorio `https://github.com/noggalito/manuales/`, bajo el directorio `assets/`. El nombre del archivo de plantilla refleja la ruta de destino con guiones en lugar de barras. Por ejemplo, `plantilla-etc-ssh-sshd_config.d-99-hardening.conf.txt` se despliega en `/etc/ssh/sshd_config.d/99-hardening.conf`.
+Las plantillas están en el repositorio `https://github.com/noggalito/debian/`, bajo el directorio `assets/13/`. El nombre del archivo de plantilla refleja la ruta de destino con guiones en lugar de barras. Por ejemplo, `plantilla-etc-ssh-sshd_config.d-99-hardening.conf.txt` se despliega en `/etc/ssh/sshd_config.d/99-hardening.conf`.
 
 Las variables dentro de las plantillas usan el prefijo `$` y se sustituyen con `sed` antes de copiar al destino:
 
@@ -4004,12 +4009,12 @@ Las URLs que usan `refs/heads/main` apuntan a la punta de la rama, que es mutabl
 ```bash
 # Obtener el SHA del commit que se desea anclar.
 # Opción A — si se tiene git instalado localmente:
-#   git ls-remote https://github.com/noggalito/manuales.git HEAD | awk '{print $1}'
+#   git ls-remote https://github.com/noggalito/debian/ HEAD | awk '{print $1}'
 # Opción B — consultar la página de commits en GitHub y copiar el SHA completo (40 caracteres)
-#   https://github.com/noggalito/manuales/commits/main
+#   https://github.com/noggalito/debian/commits/main
 
 export SHA_COMMIT="<REEMPLAZAR-POR-SHA-DE-40-CARACTERES>"
-export ASSETS_BASE="https://raw.githubusercontent.com/noggalito/manuales/${SHA_COMMIT}/assets"
+export ASSETS_BASE="https://raw.githubusercontent.com/noggalito/debian/${SHA_COMMIT}/assets/13"
 
 # Verificar que la variable quedó definida
 echo "SHA_COMMIT = ${SHA_COMMIT}"
@@ -4173,7 +4178,7 @@ Una vez en consola, en el servidor:
 ```bash
 # ¿Está SSH escuchando?
 sudo systemctl status ssh --no-pager
-sudo ss -tlnp | grep -E ":(22|17177)"
+sudo ss -tlnp | grep -E ":(22|${MIPUERTO})"
 
 # ¿UFW está bloqueando?
 sudo ufw status numbered
@@ -4370,30 +4375,20 @@ print('IPs distintas/hora  mediana:', statistics.median(len(v) for v in porhora.
 
 ### Anexo C — Reenvío de correo del sistema con `msmtp`
 
-Varias secciones del manual base envían correo al usuario `root` local: `unattended-upgrades` (sección 14.3), `rkhunter`, `debsums` y `aide` (sección 12), y el script de alertas básicas (sección 17.2). Sin un agente de transporte de correo (MTA) configurado, esos mensajes quedan en `/var/mail/root` y un humano debe leerlos manualmente desde el servidor — algo que en la práctica casi nunca ocurre.
-
-Este anexo configura un canal mínimo de salida: el correo dirigido a `root` (o a cualquier otro usuario local del sistema) se reenvía a una dirección externa usando un relay SMTP autenticado. No instala un servidor de correo completo. El servidor solo envía; no recibe.
-
-El cliente elegido es `msmtp`, que es solo un transmisor SMTP — sin demonio en escucha, sin cola persistente compleja, sin superficie de ataque adicional. Es la opción más liviana y razonable cuando lo único que se necesita es que el correo de notificaciones del sistema llegue a algún sitio.
+`unattended-upgrades` (14.3), `rkhunter`, `debsums`, `aide` (12) y el script de alertas (17.2) envían correo a `root`. Sin configuración adicional, esos mensajes quedan en `/var/mail/root`, donde casi nadie los lee. Este anexo reenvía el correo de cualquier usuario local a una dirección externa mediante un relay SMTP autenticado. El servidor solo envía; no recibe. Se usa `msmtp` porque es solo un transmisor: sin demonio en escucha ni cola propia.
 
 #### C.1 Decisiones de diseño
 
-Tres elecciones atraviesan este anexo y conviene entenderlas antes de aplicar los pasos:
-
-Aliases gestionados por msmtp, no por `/etc/aliases`. El archivo `/etc/aliases` es leído por MTAs tradicionales (Postfix, Exim, sendmail-original) que aplican la traducción `root: dirección@externa` antes de enviar al relay. msmtp no es un MTA tradicional y no consulta ese archivo. Por eso el anexo configura los aliases en `/etc/msmtp/aliases`, que sí es leído por msmtp en cada envío. Un correo dirigido a `root` se traduce a la dirección externa antes de salir al relay, evitando errores como `recipient address root not accepted by the server` que rechazaría Gmail u Office 365.
-
-Logs en journald, no en archivo dedicado. La plantilla deshabilita por defecto el `logfile` separado y registra todo vía syslog/journald. Esto evita un bug de permisos conocido (msmtp falla al abrir `/var/log/msmtp.log` cuando se invoca desde usuarios no-root, incluso con grupos correctos), aprovecha la persistencia de journald ya configurada en sección 16.1, y reduce mantenimiento (sin logrotate adicional, sin permisos especiales que vigilar).
-
-Gmail con app password como ejemplo realista. El anexo asume un relay corporativo genérico, pero documenta Gmail como caso concreto en la sub-sección C.4.1 porque es la opción más accesible cuando no hay relay propio. Outlook/Hotmail ya no se incluye porque Microsoft deshabilitó la autenticación SMTP básica en 2024 para cuentas personales y la alternativa (XOAUTH2) es demasiado compleja para un servidor de notificaciones.
+- Aliases en `/etc/msmtp/aliases`, no en `/etc/aliases`: msmtp no lee el archivo tradicional, y sin traducción el relay rechaza destinatarios como `root`.
+- Logs en journald (sección 16.1), no en archivo dedicado: evita problemas de permisos con usuarios no-root y no requiere logrotate.
+- Gmail con app password como ejemplo concreto (C.4.1). Outlook/Hotmail personales quedan fuera porque exigen XOAUTH2.
 
 #### C.2 Requisitos previos
 
-Para configurar este anexo se necesita:
-
-- Un relay SMTP accesible desde el servidor por TCP. Puede ser un servidor corporativo, un servicio transaccional (Mailgun, Brevo, Amazon SES), Gmail con app password, o un relay propio. Lo único que importa es que acepte autenticación SMTP estándar.
-- Credenciales del relay: usuario y contraseña.
-- Una dirección "From" autorizada en el relay. Muchos relays rechazan correo cuyo `From` no esté en su lista permitida; Gmail reescribe el `From` automáticamente a la dirección autenticada.
-- Una dirección de destino (a dónde llegan los correos del sistema).
+- Relay SMTP con autenticación estándar (corporativo, Mailgun, Brevo, Amazon SES, Gmail).
+- Usuario y contraseña del relay.
+- Dirección `From` autorizada en el relay.
+- Dirección de destino para el correo del sistema.
 
 #### C.3 Instalación
 
@@ -4401,327 +4396,231 @@ Para configurar este anexo se necesita:
 sudo apt install -y msmtp msmtp-mta mailutils
 ```
 
-Significado de cada paquete:
+`msmtp-mta` convierte `/usr/sbin/sendmail` en un enlace a msmtp, de modo que cron y cualquier programa que use `sendmail` envían por msmtp. `mailutils` aporta el comando `mail`.
 
-- `msmtp` — el cliente SMTP propiamente dicho.
-- `msmtp-mta` — instala un symlink de `/usr/sbin/sendmail` apuntando a `msmtp`. Esto hace que cualquier programa que use la interfaz tradicional `sendmail` (cron, mailx, scripts del sistema) envíe correo a través de `msmtp` sin saberlo.
-- `mailutils` — proporciona el comando `mail` para enviar correo desde la línea de comandos. Hay alternativas (`bsd-mailx`, `s-nail`); `mailutils` es la más común en Debian.
+##### C.3.1 Retiro de `exim4` y `bsd-mailx`
+
+La sección 12.2 instala `rkhunter`, cuyas Recommends traen `exim4` (como `default-mta`) y `bsd-mailx`. Al instalar `msmtp-mta`, apt retira los tres paquetes de `exim4`, pero los deja en estado `rc` con su configuración en `/etc/exim4/`. `bsd-mailx`, por su parte, tiene prioridad 50 frente a 30 de `mailutils` en la alternativa `mailx`, así que `/usr/bin/mail` seguiría apuntando a él. Como `mailutils` ya satisface la recomendación de `rkhunter`, se retiran ambos:
+
+```bash
+sudo apt purge exim4-base exim4-config exim4-daemon-light bsd-mailx
+sudo apt autoremove --purge
+```
+
+> `autoremove` ejecutado antes de instalar `msmtp-mta` no retira nada: mientras `exim4` sea el único MTA, apt lo considera necesario. El buzón `/var/mail/root` se conserva; conviene revisarlo una vez con `sudo less /var/mail/root`.
+
+Verificar:
+
+```bash
+dpkg -l 'exim4*' | grep -E '^(ii|rc)' || echo "exim4 eliminado por completo"
+readlink -f /usr/sbin/sendmail
+readlink -f /usr/bin/mail
+sudo ss -tlnp | grep ':25\b' || echo "nada escucha en el puerto 25"
+```
+
+Salida esperada:
+
+```
+exim4 eliminado por completo
+/usr/bin/msmtp
+/usr/bin/mail.mailutils
+nada escucha en el puerto 25
+```
 
 #### C.4 Configuración global de msmtp
 
-`msmtp` admite configuración global en `/etc/msmtprc` (para todo el sistema) y por usuario en `~/.msmtprc`. Para correo del sistema (que se envía como root desde cron, systemd, etc.), se usa la configuración global.
-
-Definir variables del relay y descargar la plantilla:
+La variable del puerto se llama `MIPUERTO_SMTP` para no pisar `MIPUERTO`, que es el puerto SSH (sección 8). `ASSETS_BASE` se define en la Parte I.
 
 ```bash
-export MIRELAY=smtp.gmail.com
-export MIPUERTO_SMTP=587    # Puerto SMTP — usar este nombre para no colisionar con $MIPUERTO (puerto SSH)
-export MIUSUARIO_SMTP=tu-cuenta@gmail.com
-export MIFROM=tu-cuenta@gmail.com
+export MIRELAY=smtp.relay.example.com
+export MIPUERTO_SMTP=587
+export MIUSUARIO_SMTP=notificaciones@example.com
+export MIFROM=notificaciones@example.com
 
-# Descargar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
-wget "${ASSETS_BASE}/plantilla-etc-msmtprc.txt" -O /tmp/plantilla-etc-msmtprc.txt
+wget "${ASSETS_BASE:?}/plantilla-etc-msmtprc.txt" -O /tmp/plantilla-etc-msmtprc.txt
 
-sed -e "s|\$MIRELAY|${MIRELAY}|g" \
-    -e "s|\$MIPUERTO_SMTP|${MIPUERTO_SMTP}|g" \
-    -e "s|\$MIUSUARIO_SMTP|${MIUSUARIO_SMTP}|g" \
-    -e "s|\$MIFROM|${MIFROM}|g" \
+sed -e "s|\$MIRELAY|${MIRELAY:?}|g" \
+    -e "s|\$MIPUERTO_SMTP|${MIPUERTO_SMTP:?}|g" \
+    -e "s|\$MIUSUARIO_SMTP|${MIUSUARIO_SMTP:?}|g" \
+    -e "s|\$MIFROM|${MIFROM:?}|g" \
     /tmp/plantilla-etc-msmtprc.txt \
     | sudo tee /etc/msmtprc > /dev/null
 
-# Permisos correctos (el archivo referencia credenciales)
 sudo chmod 0640 /etc/msmtprc
 sudo chown root:msmtp /etc/msmtprc
 ```
 
-> Nota: el grupo `msmtp` lo crea el paquete durante la instalación. Verificar con `getent group msmtp`. Si no existe (instalación atípica), usar `root:root` con modo `0600`.
+Comprobar que no quedaron variables sin sustituir (un nombre que es prefijo de otro, como `MIPUERTO` de `MIPUERTO_SMTP`, deja restos como `587_SMTP`):
+
+```bash
+sudo grep -vE '^[[:space:]]*#' /etc/msmtprc | grep -nE '\$|MI[A-Z_]+' && echo "✗ quedan variables sin sustituir" || echo "✓ plantilla sustituida"
+```
+
+Fijar el remitente. mailutils pasa a sendmail su propio remitente (`-f usuario@FQDN`), que un relay estricto rechaza; `allow_from_override off` obliga a msmtp a usar siempre el `from` configurado. La plantilla v1.2 ya lo incluye; con versiones anteriores se añade así (el comando es idempotente):
+
+```bash
+sudo grep -q '^allow_from_override' /etc/msmtprc || sudo sed -i '/^aliases/a allow_from_override off' /etc/msmtprc
+```
+
+> `allow_from_override` fija el remitente del envelope. Si el relay valida también la cabecera `From:` (Amazon SES y algunos corporativos lo hacen; Gmail la reescribe por su cuenta), añadir además `set_from_header on` en el bloque `defaults`.
 
 ##### C.4.1 Caso particular: Gmail con app password
 
-Si el relay es Gmail (cuenta personal o de Google Workspace), las variables a usar son:
-
 ```bash
 export MIRELAY=smtp.gmail.com
-export MIPUERTO_SMTP=587    # Puerto SMTP — distinto de $MIPUERTO (puerto SSH)
+export MIPUERTO_SMTP=587
 export MIUSUARIO_SMTP=tu-cuenta@gmail.com
 export MIFROM=tu-cuenta@gmail.com
 ```
 
-Pasos previos imprescindibles en la cuenta Google:
+1. Activar la verificación en dos pasos en <https://myaccount.google.com/security>.
+2. Generar una app password en <https://myaccount.google.com/apppasswords> con un nombre descriptivo (ej. `msmtp-mandarina`). Se muestra una sola vez: guardarla en el gestor de contraseñas.
+3. Usar esa clave de 16 caracteres en C.5.
 
-1. Activar la verificación en dos pasos en <https://myaccount.google.com/security>. Sin 2FA, las app passwords no están disponibles.
-2. Generar una app password específica para el servidor en <https://myaccount.google.com/apppasswords>. Asignarle un nombre descriptivo (ej. `msmtp-servidorxyz`). Google muestra una clave de 16 caracteres una sola vez; copiarla inmediatamente.
-3. Esa clave de 16 caracteres reemplaza la contraseña normal de Google en el archivo `/etc/msmtp/password` (paso C.5).
+Gmail limita las cuentas gratuitas a 500 destinatarios diarios, irrelevante para alertas. La app password da acceso completo a la cuenta; es preferible una cuenta dedicada solo a notificaciones.
 
-Notas adicionales sobre Gmail:
-
-- Gmail reescribe el header `From` a la dirección autenticada, independientemente de lo que se configure en `from`. Esto es política antifishing de Google y no se puede cambiar.
-- Cuentas Gmail gratuitas tienen un límite de 500 destinatarios por día. Para alertas de un servidor (volumen típico: pocos correos al día) es irrelevante.
-- La app password sigue siendo válida indefinidamente hasta que se revoque manualmente o se cambie la contraseña principal de Google. Guardarla en un gestor de contraseñas con anotación clara, porque solo se muestra una vez.
-
-#### C.5 Almacenamiento seguro de la contraseña
-
-La contraseña del relay no debe estar en `/etc/msmtprc` directamente. La práctica correcta es guardarla en un archivo separado con permisos restrictivos:
+#### C.5 Contraseña del relay
 
 ```bash
 sudo install -d -o root -g msmtp -m 0750 /etc/msmtp
 printf '%s' 'la-contraseña-o-app-password' | sudo tee /etc/msmtp/password > /dev/null
 sudo chmod 0640 /etc/msmtp/password
 sudo chown root:msmtp /etc/msmtp/password
-```
-
-`printf '%s'` no añade newline final (a diferencia de `echo`), lo cual algunos relays estrictos requieren.
-
-Verificar:
-
-```bash
 sudo ls -la /etc/msmtp/
 ```
 
-Salida esperada:
+`printf '%s'` evita el salto de línea final que añadiría `echo`. Salida esperada:
 
 ```
 drwxr-x--- 2 root msmtp 4096 ... .
-drwxr-xr-x ... root root 4096 ... ..
 -rw-r----- 1 root msmtp   XX ... password
 ```
 
-Para infraestructuras donde las credenciales en archivos planos no son aceptables, msmtp soporta integración con `gpg` (cifrado simétrico) o con `secret-tool` (GNOME Keyring). Esas alternativas requieren GUI o sesión de usuario y no son prácticas en un servidor headless. La protección efectiva del archivo plano es: permisos `0640` con propietario `root:msmtp`, y mantener el servidor endurecido (sin acceso lateral de usuarios sin privilegios).
-
 #### C.6 Aliases para destinatarios locales
-
-Cuando un programa del sistema envía correo a `root`, `postmaster`, `daemon` o cualquier otro usuario local, msmtp recibe ese nombre como destinatario. Si lo envía tal cual al relay externo, el servidor SMTP rechaza el correo con error `5.1.3 not a valid RFC 5321 address` (porque `root` no tiene `@dominio`).
-
-Para resolver esto, msmtp usa su propio mecanismo de aliases (separado de `/etc/aliases`, que solo es leído por MTAs tradicionales como Postfix). Se configura con un archivo de mapping y la directiva `aliases` en `/etc/msmtprc`.
-
-Crear el archivo de aliases:
 
 ```bash
 export MIDESTINO=admin@example.com
 
 sudo tee /etc/msmtp/aliases > /dev/null <<EOF
-# Aliases de msmtp: traducen destinatarios locales a direcciones externas.
-# Formato: <local>: <externa>
-# Una entrada por línea. Líneas que empiezan con # son comentarios.
-
-root: ${MIDESTINO}
+# Aliases de msmtp: <local>: <externa>
+root: ${MIDESTINO:?}
 default: ${MIDESTINO}
 EOF
 
 sudo chmod 0644 /etc/msmtp/aliases
 sudo chown root:root /etc/msmtp/aliases
-```
-
-La entrada `default:` es importante: cualquier destinatario sin `@` que no esté listado explícitamente se redirige a esa dirección. Sin ella, otros usuarios del sistema (`postmaster`, `daemon`, `mail`, cuentas de servicios) que reciban correo del sistema no se entregarán.
-
-Verificar:
-
-```bash
-sudo cat /etc/msmtp/aliases
 sudo grep '^aliases' /etc/msmtprc
 ```
 
-La salida del segundo comando debe mostrar:
-
-```
-aliases         /etc/msmtp/aliases
-```
-
-Si esa línea no aparece, añadirla manualmente al bloque `defaults` de `/etc/msmtprc`:
+`default:` captura cualquier otro usuario local (`postmaster`, `daemon`, cuentas de servicio). El `grep` debe devolver `aliases         /etc/msmtp/aliases`; si no aparece:
 
 ```bash
 sudo sed -i '/^timeout/a aliases         /etc/msmtp/aliases' /etc/msmtprc
 ```
 
-> Nota sobre `/etc/aliases`: el archivo tradicional de Unix sigue siendo respetable y otras herramientas pueden consultarlo. Si se prefiere mantener coherencia, configurarlo también con la misma redirección (`root: dirección@externa`). Pero la fuente de verdad operativa para msmtp es `/etc/msmtp/aliases`. Si en algún momento cambia la dirección de destino, cambiarla en ambos archivos.
-
-##### C.6.1 Override de AppArmor para leer el archivo de aliases
-
-Debian 13 incluye un perfil AppArmor activo para `/usr/bin/msmtp` que limita qué archivos puede leer el binario, independientemente de los permisos POSIX. El perfil contempla `/etc/msmtprc`, `/etc/mailname`, `/etc/aliases` y archivos en el home del usuario, pero no contempla `/etc/msmtp/aliases`. La denegación de AppArmor puede no aparecer en `journalctl -k` si el perfil no fuerza auditoría de ese tipo de eventos, lo que dificulta diagnosticar la causa real.
-
-La solución es agregar un override local sin desactivar el perfil, usando el mecanismo `local/` que el propio perfil ya incluye para extensiones del operador:
+El perfil de AppArmor que msmtp trae en Debian 13 está en modo enforce y no permite leer `/etc/msmtp/aliases`. Sin este override, todo envío a un destinatario local falla con `Permiso denegado` y exit 78. La denegación no aparece ni en `journalctl -k` ni en `ausearch`.
 
 ```bash
-sudo tee /etc/apparmor.d/local/usr.bin.msmtp > /dev/null <<'EOF'
-# Permitir lectura del archivo de aliases gestionado en /etc/msmtp/
-/etc/msmtp/ r,
-/etc/msmtp/aliases r,
-EOF
-
+echo '/etc/msmtp/aliases r,' | sudo tee -a /etc/apparmor.d/local/usr.bin.msmtp > /dev/null
 sudo apparmor_parser -r /etc/apparmor.d/usr.bin.msmtp
 ```
 
-Verificar que el perfil sigue cargado en modo enforce y que el override está activo:
-
-```bash
-sudo aa-status | grep -A1 msmtp
-sudo cat /etc/apparmor.d/local/usr.bin.msmtp
-```
-
-Si más adelante se decide colocar el archivo de aliases en otra ruta (por ejemplo `/etc/mail/aliases.msmtp` para alinearse con otras herramientas), reemplazar las dos líneas del override en consecuencia y recargar el perfil con `apparmor_parser -r`.
-
-> Diagnóstico cuando se sospecha de AppArmor: la pista decisiva es `sudo aa-status | grep msmtp`. Si aparece `msmtp` listado bajo "profiles are in enforce mode", el perfil está activo. La ausencia de mensajes `DENIED` en `journalctl -k` no descarta el bloqueo; algunos perfiles tienen `audit=off` para ciertas operaciones y deniegan silenciosamente.
-
 #### C.7 Configuración de mailutils
-
-`mailutils` por defecto usa su propia configuración mínima. Para que use `msmtp` para enviar y respete configuración estándar:
 
 ```bash
 sudo tee /etc/mail.rc > /dev/null <<'EOF'
-set sendmail="/usr/sbin/sendmail"
+set sendmail="sendmail:///usr/sbin/sendmail"
 set sendwait
 EOF
 ```
 
-Significado:
+En mailutils, `sendmail` es una URL de mailer, no una ruta. Con la ruta a secas (`/usr/sbin/sendmail`), mailutils ejecuta el programa sin pasarle destinatarios y msmtp responde `no se encontraron destinatarios`. `sendwait` hace que `mail` espere el resultado y muestre los errores.
 
-- `set sendmail` indica el binario a usar; en Debian con `msmtp-mta` instalado, `/usr/sbin/sendmail` es un symlink a msmtp.
-- `set sendwait` hace que `mail` espere a que el envío termine y reporte errores en pantalla, en lugar de encolar silenciosamente. Útil para que las pruebas y los scripts detecten fallos.
+#### C.8 Grupo `msmtp` para el usuario administrativo
 
-#### C.8 Acceso del usuario administrativo al grupo `msmtp`
-
-`/etc/msmtprc` tiene permisos `0640 root:msmtp`. Para que el usuario administrativo pueda enviar correo manualmente sin sudo (útil en pruebas y diagnóstico), añadirlo al grupo:
+Permite enviar correo de prueba sin `sudo`. Los servicios del sistema corren como root y no lo necesitan.
 
 ```bash
-sudo usermod -aG msmtp $MIUSUARIO
-```
-
-Cerrar y reabrir sesión SSH para que el grupo tome efecto. Verificar:
-
-```bash
+sudo usermod -aG msmtp "${MIUSUARIO:?}"
 exit
-# Reconectar SSH
-groups | grep msmtp
+# Reconectar por SSH
+id -nG | grep -qw msmtp && echo "✓ grupo msmtp cargado" || echo "✗ reabrir sesión o usar sudo"
 ```
-
-`groups` debe incluir `msmtp` en la lista. Alternativamente:
-
-```bash
-id -G | tr ' ' '\n' | grep -q '^105$' && echo "ok" || echo "falta reconectar sesión"
-```
-
-> Si no se quiere expandir el grupo al usuario administrativo, todas las pruebas de envío manual deben hacerse con `sudo`. Los servicios del sistema (cron, unattended-upgrades, scripts en `/etc/cron.hourly/`) ya corren como root, así que no necesitan esta concesión. Es decisión del operador según la política de la organización.
 
 #### C.9 Prueba de envío directo
 
-Probar primero con un envío directo vía `sendmail`, antes de depender de la traducción de aliases:
+Probar primero msmtp sin intermediarios y después a través de `mail`. Si el primero funciona y el segundo no, el problema está en C.7.
 
 ```bash
-export MIDESTINO=admin@example.com
-
-printf 'To: %s\nSubject: Prueba de msmtp desde %s\n\nMensaje de prueba directo desde %s a %s.\n' \
-  "$MIDESTINO" "$(hostname)" "$(hostname)" "$(date)" \
-  | /usr/sbin/sendmail -t
-```
-Reemplazar `admin@example.com` por la dirección real de destino. Tras unos segundos, el mensaje debe llegar a esa dirección.
-
-Si el envío falla, las dos primeras fuentes a revisar son:
-
-```bash
-sudo journalctl -t msmtp -n 20
-sudo journalctl -u systemd-journald --since "5 minutes ago"
+printf 'To: %s\nSubject: Prueba sendmail directo\n\nCuerpo de prueba.\n' "${MIDESTINO:?}" | /usr/sbin/sendmail -t; echo "exit=$?"
+echo "Prueba desde $(hostname) a $(date)." | mail -s "Prueba de msmtp desde $(hostname)" "${MIDESTINO}"
+sudo journalctl -t msmtp -n 2
 ```
 
-Errores comunes y su causa:
+Cada envío debe dejar una línea con `smtpstatus=250`, `recipients=` igual a la dirección de destino y `from=` igual al `from` de `/etc/msmtprc`. Si msmtp no llega a registrar nada, falló antes de conectar: el error aparece en la terminal.
 
-| Mensaje en el log                                          | Causa probable                                          | Solución                                                                              |
-|------------------------------------------------------------|---------------------------------------------------------|---------------------------------------------------------------------------------------|
-| `authentication failed (method LOGIN)`                     | Usuario o contraseña incorrectos                        | Verificar `/etc/msmtp/password` y el `user`. En Gmail usar app password, no la real.  |
-| `basic authentication is disabled`                         | El relay rechaza auth básica (típico Microsoft 365)     | Cambiar de relay o implementar XOAUTH2. Hotmail/Outlook personales requieren OAuth2.  |
-| `connection refused`                                       | Puerto o host incorrecto, o firewall bloqueando         | Verificar `host` y `port` en `/etc/msmtprc`, probar `nc -vz <host> <puerto>`          |
-| `sender address not allowed`                               | El `from` no está autorizado en el relay                | Pedir al admin del relay que añada la dirección, o usar una autorizada                |
-| `TLS handshake failed`                                     | Certificado del relay no confiable                      | Verificar `tls_trust_file` (típicamente `/etc/ssl/certs/ca-certificates.crt`)         |
-| `recipient address ... not a valid RFC 5321`               | Destinatario sin `@dominio` y aliases mal configurados  | Verificar `/etc/msmtp/aliases` y la directiva `aliases` en `/etc/msmtprc`             |
-| `cannot log to /var/log/msmtp.log`                         | Logfile dedicado activado pero sin permisos             | Comentar la línea `logfile` en `/etc/msmtprc` (la plantilla v1.1 ya viene así)        |
-| `Permiso denegado` sobre `/etc/msmtp/aliases` (POSIX bien) | Perfil AppArmor bloquea la lectura                      | Aplicar override de C.6.1                                                             |
+| Mensaje | Causa probable | Solución |
+|---|---|---|
+| `argumento inválido 587_SMTP para la orden port` | Sustitución incompleta de la plantilla | Revisar el `sed` de C.4 y ejecutar su verificación |
+| `no se encontraron destinatarios` (solo con `mail`) | `set sendmail` con ruta en vez de URL | Corregir `/etc/mail.rc` según C.7; `mail -n` (sin `mail.rc`) lo confirma |
+| `/etc/msmtp/aliases: Permiso denegado`, exit 78 | AppArmor bloquea la lectura de los aliases | Override de C.6 |
+| `authentication failed` | Usuario o contraseña incorrectos | Revisar `/etc/msmtp/password` y `user`; en Gmail, usar app password |
+| `basic authentication is disabled` | El relay exige OAuth2 (Microsoft 365, Outlook) | Cambiar de relay o implementar XOAUTH2 |
+| `connection refused` | Host, puerto o firewall | Revisar `host` y `port`; `nc -vz <host> <puerto>` |
+| `sender address not allowed` | `from` no autorizado en el relay | Usar una dirección autorizada; confirmar `allow_from_override off` y, si aplica, `set_from_header on` |
+| `TLS handshake failed` | Certificado del relay no confiable | Revisar `tls_trust_file` |
+| `not a valid RFC 5321 address` | Destinatario local sin traducir | Revisar `/etc/msmtp/aliases` y la directiva `aliases` |
+| `cannot log to /var/log/msmtp.log` | `logfile` activado sin permisos | Comentar `logfile`; la plantilla ya viene así |
 
 #### C.10 Prueba de redirección de aliases
 
-Una vez verificado el envío directo, probar que la traducción de `root` a la dirección externa funciona:
-
 ```bash
-printf 'To: root\nSubject: Test redirección root\n\nPrueba de redirección de root a %s\n' "$(date)" \
-  | /usr/sbin/sendmail -t
+echo "Prueba de redirección de root a $(date)" | mail -s "Test redirección root" root
+sudo journalctl -t msmtp -n 1
 ```
 
-Verificar en journald que se haya enviado a la dirección correcta:
-
-```bash
-sudo journalctl -t msmtp -n 3
-```
-
-La línea correspondiente debe contener `recipients=admin@example.com` (la dirección externa), no `recipients=root`. Si aparece `recipients=root` y el correo fue rechazado, la directiva `aliases` en `/etc/msmtprc` o el archivo `/etc/msmtp/aliases` no están bien configurados; volver a C.6.
+La línea debe mostrar `recipients=` con la dirección de `MIDESTINO`, no `recipients=root`. Si el envío falla con `Permiso denegado`, falta el override de AppArmor de C.6.
 
 #### C.11 Prueba con el flujo completo del sistema
 
-Para verificar que el script de alertas básicas (sección 17.2) llega al correo externo, forzar una alerta cambiando temporalmente un umbral:
+Requiere el script de la sección 17.2. Se fuerza una alerta bajando temporalmente el umbral de disco:
 
 ```bash
 df -h /
-```
-
-Si el `/` está al 4%, bajar el umbral a `1` para forzar alerta:
-
-```bash
 sudo sed -i 's/-ge 85/-ge 1/' /etc/cron.hourly/server-check
 sudo /etc/cron.hourly/server-check
 ```
 
-El correo con la alerta debe llegar a la dirección externa en pocos segundos. Restaurar el umbral:
+La alerta debe llegar al correo externo en pocos segundos. Restaurar:
 
 ```bash
 sudo sed -i 's/-ge 1/-ge 85/' /etc/cron.hourly/server-check
-sudo /etc/cron.hourly/server-check
+sudo /etc/cron.hourly/server-check; echo "exit=$?"
 ```
 
-El segundo `server-check` debe terminar sin output y exit code `0` (ninguna alerta activa).
+La segunda ejecución debe terminar sin salida y con `exit=0`.
 
 #### C.12 Consideraciones de seguridad
 
-Algunas observaciones útiles para mantener este canal seguro a lo largo del tiempo:
-
-La contraseña (o app password) del relay en `/etc/msmtp/password` es la pieza más sensible. Cualquier compromiso de root expone esta credencial. Mitigar usando una credencial dedicada al servidor (no la cuenta personal del administrador) y rotándola cuando se reinstala el servidor o se sospecha exposición.
-
-Si el relay corporativo soporta autenticación por OAuth2 o por certificado de cliente, son alternativas más seguras que usuario/contraseña. msmtp soporta XOAUTH2 con un script auxiliar; la configuración detallada queda fuera del alcance de este anexo y depende del proveedor.
-
-El correo enviado puede contener información sensible (nombres de paquetes con CVEs sin parchear, listados de archivos modificados, IPs baneadas por fail2ban). Confirmar que el destinatario es una dirección controlada y que el relay no la registra en logs accesibles a terceros.
-
-El firewall (UFW) no necesita reglas adicionales para correo saliente porque la política por defecto de la sección 9 es `allow outgoing`. Si en algún momento se restringe el tráfico saliente, recordar abrir el puerto del relay (típicamente 587 o 465) hacia el host del relay.
-
-Las app passwords de Gmail tienen el alcance completo de la cuenta (no se pueden restringir a SMTP únicamente). Si la cuenta tiene acceso a documentos sensibles en Drive, Calendar, etc., considerar crear una cuenta de Gmail dedicada solo para envío de notificaciones del servidor, sin acceso a otros datos.
+- `/etc/msmtp/password` es la pieza más sensible: usar una credencial dedicada al servidor y rotarla al reinstalar o ante sospecha de exposición.
+- Los correos pueden incluir información sensible (paquetes con CVE pendientes, archivos modificados, IPs baneadas); el destino debe ser una dirección controlada.
+- UFW no necesita reglas, porque la política saliente es `allow outgoing` (sección 9). Si se restringe el tráfico saliente, abrir 587 o 465 hacia el relay.
+- Si el relay admite OAuth2 o certificado de cliente, son preferibles a usuario y contraseña.
 
 #### C.13 Logs
 
-Con la configuración recomendada (logfile dedicado deshabilitado, syslog activo), todos los logs de msmtp van a journald y son consultables con:
-
 ```bash
-# Últimos 50 envíos
-sudo journalctl -t msmtp -n 50
-
-# Solo errores
-sudo journalctl -t msmtp -p err
-
-# Envíos de una ventana de tiempo
+sudo journalctl -t msmtp -n 50              # últimos envíos
+sudo journalctl -t msmtp -p err             # solo errores
 sudo journalctl -t msmtp --since "1 hour ago"
-
-# Verificación de integridad del journal
-sudo journalctl --verify
 ```
 
-journald aplica automáticamente la rotación y retención configurada en sección 16.1 (`MaxRetentionSec=3month`, `SystemMaxUse=1G` para el LV mínimo). No se requiere logrotate adicional.
-
-Si por algún motivo se prefiere un logfile dedicado para msmtp (no es la recomendación del manual base, pero puede ser útil en debugging puntual o en escenarios con auditoría específica), descomentar la línea correspondiente en `/etc/msmtprc` y crear el archivo con permisos compatibles:
+La retención la gobierna journald (sección 16.1). Si se necesita un log dedicado para depuración puntual:
 
 ```bash
-sudoedit /etc/msmtprc
-# descomentar la línea: logfile         /var/log/msmtp.log
-
+sudoedit /etc/msmtprc                       # descomentar: logfile /var/log/msmtp.log
 sudo install -o root -g msmtp -m 0660 /dev/null /var/log/msmtp.log
-```
 
-Y añadir una entrada en logrotate:
-
-```bash
 sudo tee /etc/logrotate.d/msmtp > /dev/null <<'EOF'
 /var/log/msmtp.log {
     weekly
@@ -4735,8 +4634,8 @@ sudo tee /etc/logrotate.d/msmtp > /dev/null <<'EOF'
 EOF
 ```
 
-Aunque los permisos de `/var/log/msmtp.log` sean correctos, msmtp puede mostrar el warning `cannot log to /var/log/msmtp.log: cannot open: Permission denied` al ser invocado vía el wrapper `/usr/sbin/sendmail` desde usuarios no-root, incluso con el grupo `msmtp` cargado. El envío funciona correctamente (el correo se entrega), pero el log local no se escribe. Si esto ocurre, la solución es volver a deshabilitar el `logfile` y usar solo journald.
+> Aun con permisos correctos, msmtp puede advertir `cannot log to /var/log/msmtp.log` cuando lo invoca un usuario no-root. El correo se entrega igual; si molesta, volver a comentar `logfile`.
 
 ---
 
-[Despliegue de Debian 13 Trixie server](https://github.com/noggalito/manuales/blob/main/sistemas-operativos/debian/13-server.md) © 2026 by [Calú](https://github.com/calu777) is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)<img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">
+[Despliegue de Debian 13 Trixie server](https://github.com/noggalito/debian) © 2026 by [Calú](https://github.com/calu777) in [noggalito](https://noggalito.com/) is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)<img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">
