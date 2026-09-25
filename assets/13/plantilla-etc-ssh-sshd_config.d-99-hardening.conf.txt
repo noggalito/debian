@@ -1,0 +1,44 @@
+# Plantilla de /etc/ssh/sshd_config.d/99-hardening.conf v1.1
+# Hardening de SSH para servidor Debian 13
+# Se requiere definir las variables MIPUERTO y MIUSUARIO
+
+# --- Acceso ---
+Port $MIPUERTO
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+# ChallengeResponseAuthentication es un alias obsoleto de la directiva
+# anterior desde OpenSSH 8.7: ponerla de nuevo es redundante y, si algún
+# día se les da valores distintos, gana la que aparezca primero.
+PubkeyAuthentication yes
+UsePAM yes
+
+# Limitar usuarios autorizados
+AllowUsers $MIUSUARIO
+
+# --- Endurecimiento ---
+PermitEmptyPasswords no
+MaxAuthTries 3
+MaxSessions 5
+LoginGraceTime 30
+# Desactiva de una sola vez X11, agente, TCP, sockets Unix y túneles.
+# Disponible desde OpenSSH 8.9. Sustituye a X11Forwarding,
+# AllowAgentForwarding, AllowTcpForwarding y PermitTunnel, y prevalece
+# sobre ellas si alguna se reactivara más abajo o en otro drop-in.
+# Atención: esto impide usar el servidor como salto (ssh -J / ProxyJump)
+# y cualquier túnel -L / -R. Si el rol lo necesita, comentar esta línea
+# y declarar solo el tipo de forwarding requerido.
+DisableForwarding yes
+
+# --- Sesiones ---
+ClientAliveInterval 300
+ClientAliveCountMax 2
+
+# --- Logging ---
+LogLevel VERBOSE
+
+# --- Criptografía moderna (ver 8.5) ---
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,sntrup761x25519-sha512@openssh.com
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+HostKeyAlgorithms ssh-ed25519,rsa-sha2-512,rsa-sha2-256

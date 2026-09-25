@@ -1,0 +1,68 @@
+# Plantilla de /etc/msmtprc v1.1
+# Variables que se sustituyen al desplegar:
+#   MIRELAY        - hostname del servidor SMTP de salida (ej. smtp.relay.example.com)
+#   MIPUERTO_SMTP  - puerto SMTP (587 STARTTLS / 465 TLS implícito).
+#                    Nombre distinto de MIPUERTO, que es el puerto SSH.
+#   MIUSUARIO_SMTP - usuario para autenticarse contra el relay
+#   MIFROM         - dirección "From" autorizada en el relay
+#
+# La contraseña se lee desde /etc/msmtp/password (no debe estar en este archivo).
+# Los aliases (root → dirección externa) se leen de /etc/msmtp/aliases.
+
+# Defaults aplicados a todas las cuentas
+defaults
+auth            on
+tls             on
+tls_starttls    on
+tls_trust_file  /etc/ssl/certs/ca-certificates.crt
+tls_certcheck   on
+# logfile         /var/log/msmtp.log    # deshabilitado: usar syslog/journald
+syslog          on
+timeout         30
+aliases         /etc/msmtp/aliases
+
+# Cuenta principal (relay corporativo o Gmail con app password)
+account default
+host            $MIRELAY
+port            $MIPUERTO_SMTP
+from            $MIFROM
+user            $MIUSUARIO_SMTP
+passwordeval    "cat /etc/msmtp/password"
+
+# Notas:
+# - Si el relay usa TLS implícito (puerto 465 en lugar de 587 con STARTTLS),
+#   reemplazar las dos líneas:
+#       tls             on
+#       tls_starttls    on
+#   por:
+#       tls             on
+#       tls_starttls    off
+#
+# - Para revisar logs de envío:
+#       sudo journalctl -t msmtp -n 50
+#
+# - Para depurar problemas con detalle, ejecutar manualmente con --debug:
+#       echo "Subject: test
+#
+#       cuerpo" | msmtp --debug -f origen@dominio.com destino@dominio.com
+#
+# - Si por alguna razón se prefiere log en archivo dedicado (no recomendado
+#   en el manual base), descomentar la línea `logfile` arriba y crear el
+#   archivo con permisos compatibles:
+#       sudo install -o root -g msmtp -m 0660 /dev/null /var/log/msmtp.log
+#   Atención: aun con permisos correctos, msmtp puede mostrar warnings
+#   "cannot log" al ser invocado desde usuarios no-root vía sendmail.
+#   Ver Anexo C.13 del manual.
+#
+# - Para Gmail con app password:
+#       host            smtp.gmail.com
+#       port            587
+#       Requiere 2FA activado y generar app password en
+#       https://myaccount.google.com/apppasswords
+#
+# - Para usar autenticación XOAUTH2 (Gmail/Workspace/Office365 modernos),
+#   reemplazar `passwordeval` por:
+#       auth            xoauth2
+#       passwordeval    "/usr/local/bin/oauth2-helper-script"
+#   donde el script genera un token OAuth2 fresco. Esto requiere registro
+#   de aplicación en el proveedor y queda fuera del alcance del manual base.

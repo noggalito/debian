@@ -1,0 +1,106 @@
+# Plantilla de /etc/sysctl.d/99-hardening.conf v1.1
+# Hardening de kernel y red
+#
+# Aplicar con `sudo sysctl --system`, que recorre todos los directorios de
+# configuración e imprime cada clave aplicada. Conviene leer esa salida entera
+# la primera vez: una clave que el kernel rechace aparece como
+#     sysctl: setting key "...": Invalid argument
+# y es fácil que pase inadvertida entre decenas de líneas correctas. Verificar
+# después con `sysctl <clave>` los valores que importen.
+#
+# Lo que este archivo deliberadamente NO hace: fijar net.ipv4.ip_forward = 0.
+# Parecería coherente con el resto ("este servidor no es router"), pero rompe
+# Docker, libvirt/KVM y cualquier anfitrión de contenedores o máquinas
+# virtuales, que necesitan reenvío para dar red a sus invitados. Si el servidor
+# no cumple ninguno de esos roles y se quiere cerrar, añadirlo en un archivo
+# aparte y no aquí, para que quede claro que es una decisión por rol.
+
+# === RED ===
+
+# Filtrado de paquetes de origen falsificado (anti-spoofing)
+# Aceptar paquetes solo si la ruta de retorno coincide con la interfaz de entrada.
+# Es el modo estricto. En servidores con varias interfaces y rutado asimétrico
+# —dos enlaces de salida, balanceo, algunas topologías de VPN— descarta tráfico
+# legítimo. Si aparece pérdida de paquetes inexplicable en un servidor
+# multihomed, bajar a 2 (modo laxo) antes de seguir buscando.
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+
+# SYN cookies — protección contra inundación SYN
+net.ipv4.tcp_syncookies = 1
+
+# Ignorar pings broadcast (evita ser amplificador en ataques smurf)
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+
+# Ignorar respuestas ICMP malformadas
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+
+# No aceptar redirects ICMP (un atacante en el mismo segmento podría redirigir tráfico)
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv6.conf.all.accept_redirects = 0
+net.ipv6.conf.default.accept_redirects = 0
+
+# No enviar redirects (este servidor no es router)
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+
+# No aceptar paquetes con source routing
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv6.conf.all.accept_source_route = 0
+net.ipv6.conf.default.accept_source_route = 0
+
+# Loguear paquetes con direcciones marcianas (improbables/spoof)
+net.ipv4.conf.all.log_martians = 1
+net.ipv4.conf.default.log_martians = 1
+
+# Endurecer TIME_WAIT y handshake
+net.ipv4.tcp_rfc1337 = 1
+
+# === KERNEL ===
+
+# ASLR completo (Address Space Layout Randomization)
+kernel.randomize_va_space = 2
+
+# Restringir el acceso a punteros del kernel para usuarios no privilegiados
+# (mitiga clases enteras de exploits que necesitan conocer direcciones del kernel).
+# Con valor 2 las direcciones se ocultan incluso para root, lo que deja sin
+# símbolos legibles a perf, systemtap y algunas herramientas de diagnóstico.
+# Para una sesión de depuración concreta: sysctl -w kernel.kptr_restrict=1
+kernel.kptr_restrict = 2
+
+# Restringir dmesg a usuarios privilegiados
+kernel.dmesg_restrict = 1
+
+# Restringir ptrace al ámbito padre/hijo (impide a un proceso atacar a otro
+# del mismo usuario que no sea su hijo). Requiere que el LSM Yama esté activo;
+# si no lo estuviera, la clave no existe y sysctl la reporta como error.
+# Comprobar con: sysctl kernel.yama.ptrace_scope
+# Efecto práctico: `gdb -p <pid>` sobre un proceso ajeno deja de funcionar sin
+# sudo, y strace sobre procesos no descendientes también.
+kernel.yama.ptrace_scope = 1
+
+# Restringir por completo el acceso al subsistema de eventos de rendimiento a
+# usuarios sin CAP_SYS_ADMIN. El nivel 3 no existe en el kernel original, que
+# llega hasta 2: lo añade un parche que Debian arrastra desde hace años, y es
+# además el valor que Debian ya trae por defecto. Declararlo aquí no cambia
+# nada en Debian; lo hace explícito y es la única línea de este archivo que
+# fallaría sobre un kernel compilado a mano o sobre otra distribución.
+#
+# Advertencia para anfitriones de contenedores: con el nivel 3, CAP_PERFMON no
+# basta para saltarse la restricción —solo CAP_SYS_ADMIN—, así que un contenedor
+# que declare CAP_PERFMON esperando acceso a perf no lo obtendrá.
+kernel.perf_event_paranoid = 3
+
+# Deshabilitar SysRq remoto (el "magic SysRq key" puede causar reboot, sync, kill all)
+kernel.sysrq = 0
+
+# Crashes de aplicaciones SUID no se vuelcan a disco (evita exposición de datos sensibles)
+fs.suid_dumpable = 0
+
+# Restringir hardlinks y symlinks (mitiga ataques TOCTOU clásicos en /tmp)
+fs.protected_hardlinks = 1
+fs.protected_symlinks = 1
+fs.protected_fifos = 2
+fs.protected_regular = 2

@@ -1,0 +1,54 @@
+# Plantilla de /etc/modprobe.d/99-hardening.conf v1.1
+#
+# `install <modulo> /bin/true` hace que cualquier intento de cargar el módulo
+# ejecute /bin/true en su lugar: no se carga y modprobe termina con éxito.
+# Cubre tanto la carga explícita (`modprobe x`) como la automática por alias,
+# porque el kernel pide el módulo por alias y modprobe resuelve el alias antes
+# de aplicar el install.
+#
+# Tres límites que conviene conocer:
+#   - No descarga módulos ya cargados. Para eso, `modprobe -r <modulo>` y, si
+#     está en uso, reiniciar. Comprobar con `lsmod | grep <modulo>`.
+#   - No impide `insmod` con la ruta del archivo .ko, que no consulta esta
+#     configuración. Es carga manual con root, no un vector automático.
+#   - No hace nada si la funcionalidad está compilada dentro del kernel en vez
+#     de como módulo. Verificar con:
+#         grep -E 'CONFIG_(UDF|CRAMFS|HFS|SCTP|DCCP)_FS?=' /boot/config-$(uname -r)
+#     Un `=m` significa que el install aplica; un `=y`, que no hay nada que
+#     bloquear desde aquí.
+#
+# Variante: usar /bin/false en lugar de /bin/true hace que `modprobe x` termine
+# con error en vez de con éxito. Es preferible cuando se quiere que un script
+# que intente cargar el módulo se entere del rechazo; el costo es que algunos
+# procesos de arranque tratan ese error como fallo. Esta plantilla usa
+# /bin/true por ser el comportamiento más silencioso.
+#
+# Tras modificar este archivo, si alguno de los módulos podría cargarse desde
+# el initramfs: sudo update-initramfs -u
+
+# Buses y dispositivos que no se usan en servidores
+install firewire-core /bin/true
+install firewire-ohci /bin/true
+install firewire-sbp2 /bin/true
+install thunderbolt /bin/true
+
+# Filesystems exóticos (mitigación contra montaje de USB con FS hostil)
+install cramfs /bin/true
+install freevxfs /bin/true
+install jffs2 /bin/true
+install hfs /bin/true
+install hfsplus /bin/true
+
+# udf: a diferencia de los anteriores, este sí se usa en la práctica. Es el
+# filesystem de los medios ópticos y de buena parte de las imágenes ISO.
+# Bloquearlo no afecta a un servidor de aplicaciones, pero rompe el montaje de
+# ISOs en anfitriones de virtualización (instalación de VMs, imágenes de
+# cloud-init NoCloud) y en servidores físicos con unidad óptica. Si el rol lo
+# necesita, comentar esta línea y anotarlo en el runbook (§19.3).
+install udf /bin/true
+
+# Protocolos de red poco usados (DCCP, SCTP, RDS, TIPC)
+install dccp /bin/true
+install sctp /bin/true
+install rds /bin/true
+install tipc /bin/true
