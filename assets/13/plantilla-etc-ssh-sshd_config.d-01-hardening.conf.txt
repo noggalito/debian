@@ -1,4 +1,4 @@
-# Plantilla de /etc/ssh/sshd_config.d/99-hardening.conf v1.1
+# Plantilla de /etc/ssh/sshd_config.d/01-hardening.conf v1.2
 # Hardening de SSH para servidor Debian 13
 # Se requiere definir las variables MIPUERTO y MIUSUARIO
 

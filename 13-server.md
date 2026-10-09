@@ -6,6 +6,13 @@ Este documento describe las acciones necesarias para dejar listo un sistema Debi
 
 ## a. Historial de cambios
 
+- [0.9] – 2026-10-09
+  - El Anexo C de reenvío de correo con `msmtp` pasa a ser la sección 19 de la Etapa IV, y la documentación operativa pasa a ser la sección 20. Todas las referencias internas quedan renumeradas
+  - §9.6 reescrita: aviso de que no se ejecuta en el despliegue base, descarga de los rangos a un archivo con comprobación antes de tocar ninguna regla, retiro de las reglas abiertas por número y comprobación mensual de la lista publicada
+  - Nuevo Anexo C con el firewall del proveedor de nube, que es la capa que filtra antes de UFW y la única que alcanza a los puertos publicados por contenedores. Incluye el procedimiento para Azure
+  - §11.1, §11.3 y §12.4 advierten qué revisar cuando el rol del servidor incluye contenedores
+  - §14.2 aclara que los repositorios de terceros quedan fuera de las actualizaciones automáticas
+  - Anexo C: nueva C.4 con el firewall de VPS de Hostinger a través de su API, verificada en un despliegue detrás de un borde. La verificación desde fuera y el mantenimiento pasan a ser C.5 y C.6
 - [0.8] – 2026-09-24
   - Cambio de la URL del manual y actualización de las URL de las plantillas
 - [0.7] – 2026-09-13
@@ -38,6 +45,14 @@ Este documento describe las acciones necesarias para dejar listo un sistema Debi
 - Evaluar y documentar CrowdSec como complemento o sustituto de fail2ban (§10.5). Requiere validación en entorno propio antes de escribirse como procedimiento: agente, escenarios, lista comunitaria y componente AppSec
 - Más precisión y profundidad en el uso de `borg` para respaldos
 - Inclusión de Ansible
+- Evaluar Forward Secure Sealing (FSS) del journal para servidores con requisitos de auditoría (§16.1.2)
+- Inclusión de Health Check, monitoreo y alerta, con uso de mensajería instantánea (Telegram) o correo electrónico
+- Inclusión de referencias al final
+- Verificar en entorno propio las órdenes de `az` del Anexo C.3. Están tomadas de la referencia de la CLI de Azure y no de una corrida completa
+- Verificar en entorno propio las dos órdenes del Anexo C.4 que no se han ejecutado contra la API de Hostinger: el alta de una regla con origen abierto y el borrado de una regla por su identificador
+- Añadir al Anexo C el procedimiento equivalente para otros proveedores a medida que se usen
+- Documentar el filtrado de puertos publicados por contenedores en el propio host, para servidores sin firewall de proveedor (Anexo C.1)
+- Verificar sobre un servidor con contenedores la exclusión de AIDE de §12.4 y revisar el primer reporte diario posterior
 
 ## c. Requerimientos previos
 
@@ -111,7 +126,7 @@ Este documento describe las acciones necesarias para dejar listo un sistema Debi
 
 #### 8. Hardening de SSH
 
-- [8.1 Archivo modular `/etc/ssh/sshd_config.d/99-hardening.conf`](#81-archivo-modular-etcsshsshd_configd99-hardeningconf)
+- [8.1 Archivo modular `/etc/ssh/sshd_config.d/01-hardening.conf`](#81-archivo-modular-etcsshsshd_configd01-hardeningconf)
 - [8.2 Cambio de puerto, password auth y solo pubkey](#82-cambio-de-puerto-password-auth-y-solo-pubkey)
 - [8.3 Restricción de usuarios (`AllowUsers`)](#83-restricción-de-usuarios-allowusers)
 - [8.4 Límites de sesión y timeouts](#84-límites-de-sesión-y-timeouts)
@@ -204,12 +219,28 @@ Este documento describe las acciones necesarias para dejar listo un sistema Debi
 - [18.5 Prueba de restauración](#185-prueba-de-restauración)
 - [18.6 Restauración del servidor desde cero](#186-restauración-del-servidor-desde-cero)
 
-#### 19. Documentación operativa
+#### 19. Reenvío de correo del sistema con `msmtp`
 
-- [19.1 Inventario del servidor](#191-inventario-del-servidor)
-- [19.2 Diagrama lógico](#192-diagrama-lógico)
-- [19.3 Runbook básico](#193-runbook-básico)
-- [19.4 Mantenimiento de la documentación](#194-mantenimiento-de-la-documentación)
+- [19.1 Decisiones de diseño](#191-decisiones-de-diseño)
+- [19.2 Requisitos previos](#192-requisitos-previos)
+- [19.3 Instalación](#193-instalación)
+- [19.4 Configuración global de msmtp](#194-configuración-global-de-msmtp)
+- [19.5 Contraseña del relay](#195-contraseña-del-relay)
+- [19.6 Aliases para destinatarios locales](#196-aliases-para-destinatarios-locales)
+- [19.7 Configuración de mailutils](#197-configuración-de-mailutils)
+- [19.8 Grupo `msmtp` para el usuario administrativo](#198-grupo-msmtp-para-el-usuario-administrativo)
+- [19.9 Prueba de envío directo](#199-prueba-de-envío-directo)
+- [19.10 Prueba de redirección de aliases](#1910-prueba-de-redirección-de-aliases)
+- [19.11 Prueba con el flujo completo del sistema](#1911-prueba-con-el-flujo-completo-del-sistema)
+- [19.12 Consideraciones de seguridad](#1912-consideraciones-de-seguridad)
+- [19.13 Logs](#1913-logs)
+
+#### 20. Documentación operativa
+
+- [20.1 Inventario del servidor](#201-inventario-del-servidor)
+- [20.2 Diagrama lógico](#202-diagrama-lógico)
+- [20.3 Runbook básico](#203-runbook-básico)
+- [20.4 Mantenimiento de la documentación](#204-mantenimiento-de-la-documentación)
 
 #### [Cierre de la Etapa IV](#cierre-de-la-etapa-iv)
 
@@ -236,21 +267,14 @@ Este documento describe las acciones necesarias para dejar listo un sistema Debi
 - [B.10 Cuándo escalar](#b10-cuándo-escalar)
 - [B.11 Síntoma: volumen anómalo de peticiones en un servicio web](#b11-síntoma-volumen-anómalo-de-peticiones-en-un-servicio-web)
 
-#### Anexo C — Reenvío de correo del sistema con `msmtp`
+#### Anexo C — Firewall del proveedor de nube
 
-- [C.1 Decisiones de diseño](#c1-decisiones-de-diseño)
-- [C.2 Requisitos previos](#c2-requisitos-previos)
-- [C.3 Instalación](#c3-instalación)
-- [C.4 Configuración global de msmtp](#c4-configuración-global-de-msmtp)
-- [C.5 Almacenamiento seguro de la contraseña](#c5-almacenamiento-seguro-de-la-contraseña)
-- [C.6 Aliases para destinatarios locales](#c6-aliases-para-destinatarios-locales)
-- [C.7 Configuración de mailutils](#c7-configuración-de-mailutils)
-- [C.8 Acceso del usuario administrativo al grupo `msmtp`](#c8-acceso-del-usuario-administrativo-al-grupo-msmtp)
-- [C.9 Prueba de envío directo](#c9-prueba-de-envío-directo)
-- [C.10 Prueba de redirección de aliases](#c10-prueba-de-redirección-de-aliases)
-- [C.11 Prueba con el flujo completo del sistema](#c11-prueba-con-el-flujo-completo-del-sistema)
-- [C.12 Consideraciones de seguridad](#c12-consideraciones-de-seguridad)
-- [C.13 Logs](#c13-logs)
+- [C.1 Dos firewalls, dos alcances](#c1-dos-firewalls-dos-alcances)
+- [C.2 Reglas según el momento del despliegue](#c2-reglas-según-el-momento-del-despliegue)
+- [C.3 Azure: grupo de seguridad de red](#c3-azure-grupo-de-seguridad-de-red)
+- [C.4 Hostinger: firewall del VPS](#c4-hostinger-firewall-del-vps)
+- [C.5 Verificación desde fuera](#c5-verificación-desde-fuera)
+- [C.6 Mantenimiento](#c6-mantenimiento)
 
 ---
 
@@ -600,21 +624,53 @@ exit
 
 El objetivo es que `systemctl --failed` devuelva *"0 loaded units listed"* antes de continuar. Cualquier fallo a este nivel se resuelve aquí, no más adelante.
 
-> En máquinas virtuales sin dispositivo vsock aparece `systemd-ssh-generator: Failed to query local AF_VSOCK CID`. Es un bug conocido de systemd (Debian #1137216), inofensivo, y reaparece en cada `daemon-reload`. Para silenciarlo, añadir `systemd.ssh_auto=no` a `GRUB_CMDLINE_LINUX_DEFAULT`.
+> En imágenes cloud (Azure, AWS y la mayoría de VPS) root no tiene contraseña y `sudo` ya viene configurado para el usuario creado en el aprovisionamiento, así que `su -` no funciona. En ese caso, sustituir `su -` por `sudo -i` aquí y en la sección 2.5.3.
+
+> En máquinas virtuales sin dispositivo vsock (KVM sin `vhost-vsock`, Hyper-V/Azure y muchos VPS) aparece `systemd-ssh-generator: Failed to query local AF_VSOCK CID`, acompañado de `systemd-ssh-generator failed with exit status 1`. Es un bug conocido de systemd (Debian #1137216) e inofensivo, pero reaparece en cada `daemon-reload`, es decir, tras cada instalación de paquetes que recargue systemd. El resultado es un `journalctl -p err` que nunca está limpio, y un log de errores que siempre trae ruido acostumbra a ignorarlo.
+>
+> Para silenciarlo sin reiniciar, enmascarar el generador desde la misma shell de root (o con `sudo` más adelante, una vez completada la sección 3):
+>
+> ```bash
+> mkdir -p /etc/systemd/system-generators
+> ln -s /dev/null /etc/systemd/system-generators/systemd-ssh-generator
+> systemctl daemon-reload
+> journalctl -p err --since "2 minutes ago"   # debe devolver "-- No entries --"
+> ```
+>
+> El directorio `/etc/systemd/system-generators/` no existe por defecto; sin el `mkdir` el enlace falla con "No existe el fichero o el directorio". La prueba con `daemon-reload` es la adecuada porque es precisamente lo que disparaba el error. Enmascarar el generador también desactiva el acceso SSH local por socket AF_UNIX que el generador configura, algo que un servidor administrado en remoto no usa.
+>
+> La alternativa por línea de kernel (`systemd.ssh_auto=no` en `GRUB_CMDLINE_LINUX_DEFAULT`) requiere `update-grub` y un reinicio, y en imágenes cloud conviene comprobar antes que ningún archivo de `/etc/default/grub.d/` redefina esa variable.
 
 ##### 2.5.3 Estado del disco y particiones
 
 ```bash
+su -
+
 # Esquema de bloques
 lsblk -f
 
 # Espacio en cada punto de montaje
 df -hT
 
-# Verificar que LVM y LUKS (si aplica) están activos
-sudo pvs && sudo vgs && sudo lvs
-sudo cryptsetup status $(ls /dev/mapper/ | grep -v control | head -1)  # si hay LUKS
+# LVM (si aplica)
+if lsblk -rno TYPE | grep -qx lvm; then
+    pvs && vgs && lvs
+else
+    echo "Sin volúmenes LVM"
+fi
+
+# LUKS (si aplica)
+CRYPT_DEVS=$(lsblk -rno NAME,TYPE | awk '$2 == "crypt" {print $1}' | sort -u)
+if [ -n "${CRYPT_DEVS}" ]; then
+    for dev in ${CRYPT_DEVS}; do cryptsetup status "${dev}"; done
+else
+    echo "Sin volúmenes LUKS"
+fi
+
+exit
 ```
+
+Las comprobaciones de LVM y LUKS se basan en el tipo de dispositivo que reporta `lsblk`, no en la presencia de los comandos ni en el contenido de `/dev/mapper/`. En un VPS o una imagen cloud lo habitual es no tener ninguno de los dos (2.2.3), y en un esquema con LVM sin cifrado `/dev/mapper/` contiene volúmenes lógicos que `cryptsetup` no debe recibir. Si el esquema de la sección 2.2 usa LVM o LUKS, la salida correspondiente no puede ser "Sin volúmenes".
 
 ##### 2.5.4 Red funcionando
 
@@ -646,7 +702,7 @@ Este acceso en este momento es con la configuración por defecto del instalador 
 **Lo que esta sección deliberadamente no incluye:**
 
 - Configuración de IP estática definitiva: se hace en sección 4 (identidad) o varía demasiado según proveedor de nube.
-- Instalación de QEMU guest agent / open-vm-tools / cloud-init: pertenece a un anexo específico por plataforma.
+- Instalación de QEMU guest agent / open-vm-tools / cloud-init: pertenece a un anexo específico por plataforma. La excepción es la regla `sudo` sin contraseña que cloud-init deja en los VPS, que por ser un asunto de seguridad se neutraliza en la sección 7.3.4.
 - Firmware no-free adicional (microcódigo Intel/AMD): se gestiona con los repositorios en sección 5, no durante la instalación base.
 
 **Lo que los manuales específicos (mail, web, Apache, WordPress, etc.) deben añadir sobre esta base:**
@@ -707,7 +763,7 @@ Introducir la contraseña de root. El prompt cambiará a `root@<hostname>:~#`.
 export MIUSUARIO=usuario
 apt update
 apt install -y sudo
-usermod -aG sudo $MIUSUARIO
+usermod -aG sudo "${MIUSUARIO:?}"
 ```
 
 En Debian, pertenecer al grupo `sudo` es suficiente para obtener permisos completos, porque `/etc/sudoers` incluye por defecto:
@@ -869,11 +925,14 @@ sudo cp /etc/hosts /etc/hosts.ori
 export MIHOST=villonaco
 export MIFQDN=villonaco.ejemplo.com
 
-# Descargar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
-wget "${ASSETS_BASE}/plantilla-etc-hosts.txt" -O /tmp/plantilla-etc-hosts.txt
-
+# Descargar y aplicar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+: "${ASSETS_BASE:?}" "${MIHOST:?}" "${MIFQDN:?}" && \
+wget "${ASSETS_BASE}/plantilla-etc-hosts.txt" -O /tmp/plantilla-etc-hosts.txt && \
 sed -e "s|\$MIFQDN|${MIFQDN}|g" -e "s|\$MIHOST|${MIHOST}|g" \
     /tmp/plantilla-etc-hosts.txt | sudo tee /etc/hosts > /dev/null
+
+# Comprobar que no quedó ningún marcador sin sustituir
+grep -n '\$MI[A-Z_]*' /etc/hosts || echo "✓ plantilla aplicada"
 ```
 
 Es probable que la terminal arroje un error como: `sudo: unable to resolve host villonaco: Nombre o servicio desconocido`, sin embargo se debe omitir ese mensaje y avanzar.
@@ -1180,7 +1239,7 @@ EOF
 > sudo chattr +i /etc/resolv.conf
 > ```
 >
-> Esto impide cualquier modificación, incluso por root, hasta que se quite el atributo con `sudo chattr -i /etc/resolv.conf`. Es una solución de fuerza bruta y conviene documentarla en el inventario del servidor (sección 19.1) para que no sorprenda a quien intente modificar la red en el futuro.
+> Esto impide cualquier modificación, incluso por root, hasta que se quite el atributo con `sudo chattr -i /etc/resolv.conf`. Es una solución de fuerza bruta y conviene documentarla en el inventario del servidor (sección 20.1) para que no sorprenda a quien intente modificar la red en el futuro.
 
 ##### 5.5.7 Verificación final
 
@@ -1319,7 +1378,7 @@ La configuración detallada de `sudo` (políticas en `/etc/sudoers.d/`, insults,
 
 ```bash
 export MIUSUARIO=usuario
-id $MIUSUARIO
+id "${MIUSUARIO:?}"
 ```
 
 Salida esperada:
@@ -1331,15 +1390,17 @@ uid=1000(<usuario>) gid=1000(<usuario>) grupos=1000(<usuario>),27(sudo),...
 El grupo `sudo` (GID 27 en Debian) debe estar presente. Si no, añadirlo:
 
 ```bash
-sudo usermod -aG sudo $MIUSUARIO
+sudo usermod -aG sudo "${MIUSUARIO:?}"
 ```
+
+> **Nota:** las variables exportadas solo existen en la sesión donde se definieron. Al reconectar por SSH, o dentro de una shell abierta con `sudo -i` (que limpia el entorno por `env_reset`), `MIUSUARIO` está vacía y hay que volver a definirla. La forma `${MIUSUARIO:?}` convierte ese olvido en un error visible en lugar de un comando ejecutado con un argumento vacío.
 
 #### 7.2 Grupos recomendados para el usuario administrativo
 
 Añadir el usuario al grupo `adm` permite leer logs del sistema sin `sudo`. Es una comodidad razonable en un servidor con un solo administrador:
 
 ```bash
-sudo usermod -aG adm $MIUSUARIO
+sudo usermod -aG adm "${MIUSUARIO:?}"
 ```
 
 Otros grupos que pueden ser útiles según el rol futuro del servidor (no se añaden ahora, solo se documentan):
@@ -1357,6 +1418,8 @@ La pertenencia a grupos privilegiados debe tratarse como concesión de permisos,
 
 La configuración se hace en un archivo separado dentro de `/etc/sudoers.d/` para no tocar el archivo canónico gestionado por el paquete.
 
+Toda esta sección se ejecuta y se verifica desde la sesión del usuario administrativo, no desde una shell de root. Como root pasa cualquier comprobación de sudo por definición, una verificación hecha ahí devuelve el resultado correcto aunque la configuración esté rota. La única excepción es la verificación de 7.3.3, que necesita una shell de root abierta de antemano como red de seguridad.
+
 ##### 7.3.1 Archivo de hardening de sudoers
 
 ```bash
@@ -1370,12 +1433,15 @@ Defaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/b
 # El ticket de sudo expira a los 5 minutos de inactividad
 Defaults timestamp_timeout=5
 
-# Requiere TTY real; evita que scripts sin supervisión usen sudo
-# Comentar esta línea si el servidor es gestionado con Ansible u otra herramienta sin TTY
-Defaults requiretty
+# Requiere TTY real. Descomentar solo en servidores sin automatización alguna;
+# ver la nota de esta sección antes de activarla
+#Defaults requiretty
 
 # Registrar la sesión completa (output) de cada ejecución sudo en /var/log/sudo-io/
 Defaults log_output
+
+# No duplicar en sudo-io la salida de journalctl: el journal ya es el registro original
+Defaults!/usr/bin/journalctl !log_output
 
 # Notificar al administrador cuando se introduce una contraseña incorrecta en sudo
 Defaults mail_badpass
@@ -1392,11 +1458,15 @@ sudo chmod 440 /etc/sudoers.d/99-hardening
 sudo chown root:root /etc/sudoers.d/99-hardening
 ```
 
-> **Sobre `requiretty`:** esta directiva puede romper herramientas de automatización sin TTY (Ansible, algunos scripts en systemd units). Si el servidor va a ser gestionado con una de estas herramientas, comentar esa línea o añadir una excepción por usuario:
+Sobre la excepción de `journalctl`: `log_output` guarda en `/var/log/sudo-io/` todo lo que la orden imprime. Para la mayoría de comandos administrativos eso es evidencia valiosa, pero para `journalctl` es una copia del propio journal que crece con cada consulta; un `sudo journalctl -f` olvidado en una terminal la hace crecer sin límite. La excepción conserva la traza de quién consultó los logs y cuándo (la línea `COMMAND=` que sudo escribe en el journal) y solo deja de guardar la salida. sudo aplica los `Defaults` específicos de comando después de los globales, así que el orden de las líneas dentro del archivo no importa. La retención de `/var/log/sudo-io/` se configura en la sección 16.2.1, porque `logrotate` no la cubre.
+
+> Sobre `requiretty`: la plantilla la deja comentada a propósito. La directiva impide usar sudo desde cualquier contexto sin TTY, y eso no se limita a Ansible: también rompe sudo desde cron, desde units de systemd, y desde cualquier script de mantenimiento o respaldo que se ejecute sin sesión interactiva. El beneficio defensivo es modesto frente a lo que inhabilita, y el síntoma —un script que funciona a mano y falla en su timer, sin más error que `sorry, you must have a tty to run sudo`— es desagradable de diagnosticar. Activarla solo en servidores operados exclusivamente a mano, y anotarlo en el runbook (§20.3). Si se activa y luego hace falta una excepción puntual:
 >
 > ```
 > Defaults:miusuario_ansible !requiretty
 > ```
+
+> `mail_badpass` depende del reenvío de correo de la sección 19, que se configura bastante después. Hasta entonces cada contraseña incorrecta intenta un envío que no llega a ninguna parte, sin consecuencias para el sistema. No es necesario retirar la directiva: al terminar la Etapa IV empieza a funcionar sola.
 
 ##### 7.3.2 Verificación
 
@@ -1405,11 +1475,46 @@ sudo visudo -c      # verifica la sintaxis de todo el árbol sudoers
 sudo -l             # lista los privilegios del usuario actual con la nueva configuración
 ```
 
+Estas dos órdenes se ejecutan desde la sesión del usuario administrativo. Como root, `sudo -l` describe los privilegios de root y no los de nadie más, de modo que una configuración rota para `$MIUSUARIO` pasa la prueba sin que nada lo delate. Si hace falta consultar los privilegios de otro usuario sin abrir su sesión, la forma correcta es:
+
+```bash
+sudo -l -U "${MIUSUARIO:?}"
+```
+
+Cada archivo de `/etc/sudoers.d/` debe quedar con modo `0440` y propietario `root:root`. Si no, `visudo -c` lo reporta con `bad permissions, should be mode 0440` y termina con error, aunque sudo siga leyendo el archivo (sudo solo rechaza los que el grupo u otros pueden escribir). `visudo -f` no garantiza esos permisos al crear un archivo nuevo, así que tras crearlo se aplican siempre de forma explícita:
+
+```bash
+sudo chown root:root /etc/sudoers.d/<archivo>
+sudo chmod 0440 /etc/sudoers.d/<archivo>
+```
+
+> **Nota:** `@includedir` ignora los archivos cuyo nombre contiene un punto o termina en `~`. Un `/etc/sudoers.d/99-hardening.conf` no tendría ningún efecto, sin que nada avise.
+
+Para comprobar que el registro de E/S y la excepción de `journalctl` funcionan, desde la sesión del usuario administrativo:
+
+```bash
+sudo true
+sudo journalctl -n 1 > /dev/null
+sudo journalctl -n 6 _COMM=sudo | grep COMMAND
+```
+
+La línea de `COMMAND=/usr/bin/true` debe llevar un campo `TSID=`, que es el identificador de la sesión grabada en `/var/log/sudo-io/`. Las líneas de `journalctl` no deben llevarlo.
+
 ##### 7.3.3 pam_faillock — lockout PAM para escalada local
 
 fail2ban (sección 10) protege contra fuerza bruta sobre SSH. No protege contra intentos de escalada local: un atacante con acceso a la consola o con una sesión no privilegiada puede intentar `su -` o contraseñas de `sudo` repetidamente sin que fail2ban intervenga. `pam_faillock` (incluido en `libpam-modules`, sin instalación adicional) añade lockout a nivel PAM cubriendo cualquier servicio que pase por `pam_unix`: login de consola, `su`, `sudo`, y SSH cuando usa PAM.
 
-**Configuración del comportamiento:**
+Esta es la subsección más delicada del manual completo. Una edición mal hecha en `/etc/pam.d/common-auth` deja el sistema sin autenticación por contraseña para ningún usuario, con el archivo sintácticamente válido y sin un solo error en los logs. Si root ya está bloqueado (7.6) y el acceso por llave SSH falla, el único camino de vuelta es la consola de rescate del proveedor.
+
+Requisito previo: el usuario administrativo necesita una contraseña utilizable, porque es la que sudo va a pedir. Un usuario creado con `adduser --disabled-password` para acceso solo por llave SSH no la tiene, y la verificación de esta subsección fracasaría sin que exista nada que arreglar en PAM.
+
+```bash
+sudo passwd -S "${MIUSUARIO:?}"
+```
+
+La segunda columna debe ser `P`. Si muestra `L` o `NP`, asignar la contraseña con `sudo passwd "${MIUSUARIO:?}"` antes de continuar.
+
+Configuración del comportamiento:
 
 ```bash
 sudo tee /etc/security/faillock.conf > /dev/null <<'EOF'
@@ -1430,46 +1535,90 @@ silent
 EOF
 ```
 
-**Activación en PAM:**
-
-`pam_faillock` se integra en `/etc/pam.d/common-auth`. Editar este archivo con extremo cuidado: un error puede dejar el sistema sin autenticación funcional.
+Activación en PAM. Antes de editar, abrir una shell de root en la sesión paralela (4.4) y dejarla abierta hasta terminar la verificación:
 
 ```bash
-# Respaldar siempre antes de modificar archivos PAM
+sudo -i
+# No cerrar esta shell hasta que la verificación de más abajo haya pasado
+```
+
+Desde la sesión principal, respaldar y editar:
+
+```bash
 sudo cp /etc/pam.d/common-auth /etc/pam.d/common-auth.ori
 sudoedit /etc/pam.d/common-auth
 ```
 
-Añadir la línea de `preauth` **antes** del módulo `pam_unix.so`, y la de `authfail` inmediatamente **después**. La estructura resultante debe quedar así (las líneas existentes se conservan; solo se añaden las marcadas):
+El archivo que trae Debian contiene tres líneas activas, en este orden: el `pam_unix.so` que autentica, y un bloque de cierre con `pam_deny.so` y `pam_permit.so`. Las tres líneas de `pam_faillock` se insertan alrededor del `pam_unix.so` existente, sin mover ni comentar el bloque de cierre, que debe quedar al final del archivo. El resultado efectivo —el que se obtiene filtrando comentarios y líneas vacías— tiene que ser exactamente este:
 
 ```
-# [AÑADIR] pam_faillock: contar fallos antes de autenticar
 auth    required                        pam_faillock.so preauth
-# [EXISTENTE] autenticación principal de contraseñas
 auth    [success=1 default=ignore]      pam_unix.so nullok
-# [AÑADIR] pam_faillock: registrar el fallo si pam_unix no autenticó
 auth    [default=die]                   pam_faillock.so authfail
-# [AÑADIR] pam_faillock: limpiar el contador si la autenticación tuvo éxito
 auth    sufficient                      pam_faillock.so authsucc
+auth    requisite                       pam_deny.so
+auth    required                        pam_permit.so
 ```
 
-> **Atención:** la forma exacta de la línea `pam_unix.so` varía según las opciones instaladas en el sistema. Verificar el aspecto actual del archivo antes de editar. Si tras la modificación el login falla completamente, desde la sesión paralela (sección 4.4) ejecutar:
->
-> ```bash
-> sudo cp /etc/pam.d/common-auth.ori /etc/pam.d/common-auth
-> ```
-
-**Verificación:**
+Comprobar el orden antes de probar nada:
 
 ```bash
-# Autenticarse con contraseña incorrecta varias veces y luego verificar el bloqueo
-sudo faillock --user $MIUSUARIO
-
-# Desbloquear manualmente (útil si se bloqueó uno mismo durante pruebas)
-sudo faillock --user $MIUSUARIO --reset
+grep -vE '^\s*#|^\s*$' /etc/pam.d/common-auth
 ```
 
-**Comandos de operación:**
+> **ATENCIÓN.** El error más fácil de cometer es añadir el bloque de faillock al final del archivo, debajo de `pam_deny.so`. `pam_deny.so` declarado como `requisite` rechaza y aborta la pila de inmediato, así que todo lo que venga después nunca se ejecuta: ni faillock ni `pam_unix`. El resultado es que ninguna contraseña funciona para ningún usuario no-root, en sudo, en `su` y en el login de consola. La sintaxis es válida, `pam-auth-update` no se queja, y el journal no registra ningún fallo de autenticación porque la autenticación nunca llega a intentarse. Verificar con el `grep` de arriba que `pam_deny.so` y `pam_permit.so` son las dos últimas líneas.
+>
+> Para revertir desde la shell de root que quedó abierta:
+>
+> ```bash
+> cp /etc/pam.d/common-auth.ori /etc/pam.d/common-auth
+> ```
+
+Verificación. Se hace desde la shell de root, invocando una sesión del usuario administrativo, de modo que un fallo no deje a nadie fuera del sistema:
+
+```bash
+su - "${MIUSUARIO:?}"
+sudo -k
+sudo true      # debe pedir la contraseña del usuario y aceptarla
+exit
+```
+
+Si `sudo true` acepta la contraseña, la pila está bien y se puede cerrar la shell de root. Si la rechaza, el problema es el orden de PAM y no la contraseña: revertir con el respaldo y revisar el `grep`.
+
+Comprobado eso, provocar el bloqueo. Desde la sesión del usuario administrativo, con la shell de root todavía abierta:
+
+```bash
+sudo -k
+sudo true      # introducir una contraseña incorrecta hasta agotar los intentos, varias veces
+```
+
+El `sudo -k` descarta el ticket vigente; sin él, sudo no pediría contraseña durante `timestamp_timeout` y la prueba no contaría nada. De vuelta en la shell de root, comprobar el bloqueo y deshacerlo:
+
+```bash
+faillock --user "${MIUSUARIO:?}"
+faillock --user "${MIUSUARIO:?}" --reset
+```
+
+Una cuenta bloqueada no puede desbloquearse a sí misma: `sudo faillock --reset` pediría la contraseña y fallaría por el propio bloqueo, sin otro mensaje que el de contraseña incorrecta (`silent`). Por eso la prueba necesita la shell de root abierta de antemano.
+
+Diagnóstico cuando sudo rechaza una contraseña que debería ser válida. El mensaje es el mismo en los cuatro casos, así que hay que discriminar por comandos:
+
+| Comprobación | Resultado | Causa |
+|---|---|---|
+| `faillock --user <usuario>` | tabla con fallos registrados | bloqueo activo; esperar `unlock_time` o `--reset` |
+| `faillock --user <usuario>` | tabla vacía tras varios fallos | la pila PAM se corta antes de llegar a faillock; revisar el orden de `pam_deny.so` |
+| `passwd -S <usuario>` | segunda columna `L` o `NP` | la cuenta no tiene contraseña utilizable |
+| `su - <usuario>` desde root | acepta la contraseña, sudo no | problema en `/etc/pam.d/sudo` o en `/etc/sudoers.d/` |
+
+Una tabla de faillock vacía después de varios intentos fallidos es un síntoma, no una señal de normalidad: significa que `pam_faillock.so authfail` nunca se ejecutó. El journal lo confirma, porque en ese escenario tampoco aparece ningún `authentication failure` de `pam_unix`:
+
+```bash
+sudo journalctl --since "10 minutes ago" | grep -iE 'pam|faillock'
+```
+
+> **Nota:** en VPS con cloud-init, completar antes la sección 7.3.4 si la regla heredada afecta al usuario administrativo. Mientras exista un `NOPASSWD` para ese usuario, sudo no lo autentica y esta prueba no dispara ningún bloqueo.
+
+Comandos de operación:
 
 ```bash
 # Ver el estado de bloqueo de cualquier usuario
@@ -1481,6 +1630,69 @@ sudo faillock --user <usuario> --reset
 # Ver los eventos de fallo en auditd (requiere auditd activo, sección 12)
 sudo ausearch -m USER_LOGIN -sv no | tail -20
 ```
+
+##### 7.3.4 Reglas heredadas del aprovisionamiento (VPS con cloud-init)
+
+Las imágenes cloud (Azure, AWS y buena parte de los VPS) dejan en el primer arranque un archivo `/etc/sudoers.d/90-cloud-init-users` con una regla `NOPASSWD`. A quién beneficia esa regla depende de cómo aprovisione el proveedor, y la diferencia importa:
+
+```
+# User rules for <usuario>
+<usuario> ALL=(ALL) NOPASSWD:ALL
+```
+
+Si la regla es para el usuario administrativo creado por cloud-init, las consecuencias son serias. Las reglas de sudo se suman, así que `99-hardening` no la anula. Y como `@includedir` está al final de `/etc/sudoers`, esta es la última regla que coincide para el usuario, que es la que sudo aplica: ningún comando pide contraseña. Quien consiga la llave SSH del administrador obtiene root sin otra barrera, `pam_faillock` (7.3.3) nunca se dispara para sudo porque sudo no pasa por la autenticación de PAM, y `mail_badpass` (7.3.1) nunca tiene nada que notificar.
+
+Si la regla es para root —el caso de los proveedores que entregan la máquina con root como única cuenta y dejan al operador crear la suya— el efecto práctico es nulo, porque root no necesita sudo para nada. Igual conviene retirarla: es un hallazgo que marcan lynis y las guías CIS, y explicarlo en una auditoría cuesta más que borrar el archivo.
+
+Detección, desde la sesión del usuario administrativo:
+
+```bash
+ls -l /etc/sudoers.d/
+sudo grep -rn NOPASSWD /etc/sudoers /etc/sudoers.d/
+sudo -k
+sudo true                      # si no pide contraseña, NOPASSWD está activo
+sudo -l | grep -i nopasswd     # muestra "(ALL) NOPASSWD: ALL" si está activo
+```
+
+> **ATENCIÓN:** estas tres últimas órdenes no sirven ejecutadas como root. Un `sudo -l` desde root devuelve `(ALL) NOPASSWD: ALL` siempre, por la regla implícita que root tiene sobre sí mismo, exista o no el archivo de cloud-init. Interpretar esa salida como confirmación del problema lleva a buscar una regla que puede no existir.
+
+> **Atención:** `sudo -v` tampoco sirve como prueba. Con el valor por defecto `verifypw=all`, `sudo -v` pide contraseña si al menos una de las reglas del usuario la exige, y la regla `%sudo ALL=(ALL:ALL) ALL` de `/etc/sudoers` la exige. Pide contraseña aunque todos los demás comandos se ejecuten sin ella.
+
+Antes de retirar la regla, si beneficia al usuario administrativo, hay que confirmar que ese usuario tiene una contraseña funcional; si no, se queda sin sudo:
+
+```bash
+sudo passwd -S "${MIUSUARIO:?}"
+```
+
+La segunda columna debe ser `P` (contraseña establecida), por ejemplo `usuario P 2026-09-26 1 90 14 -1`. Si muestra `L` o `NP`, asignarla primero con `sudo passwd "${MIUSUARIO:?}"`. Confirmar también la pertenencia al grupo `sudo` (7.1).
+
+Conviene además leer el archivo completo antes de borrarlo. Son pocos bytes y puede contener más de una regla:
+
+```bash
+sudo cat /etc/sudoers.d/90-cloud-init-users
+```
+
+Con una segunda sesión SSH abierta como respaldo (4.4):
+
+```bash
+sudo rm /etc/sudoers.d/90-cloud-init-users
+sudo visudo -c
+sudo -k
+sudo true      # ahora debe pedir contraseña
+```
+
+El `visudo -c` no es opcional ni decorativo: conviene dejarlo como paso fijo después de cualquier cambio en `/etc/sudoers.d/`. Un árbol de sudoers con un error de sintaxis inhabilita la escalada de privilegios por completo, y la única vía de reparación es la consola de rescate.
+
+Cerrar la sesión de respaldo solo después de comprobar que `sudo true` pide la contraseña y la acepta. El cambio es inmediato: el propio `visudo -c` ya la pedirá.
+
+Sobre la regeneración: el módulo de usuarios de cloud-init se ejecuta una vez por instancia, así que el archivo no reaparece en reinicios normales. Solo volvería si cambia el identificador de instancia, por ejemplo al redesplegar la VM o capturar su imagen. Es preferible detectarlo a prevenirlo: AIDE (12.4) vigila `/etc` con la configuración por defecto de Debian, así que un `90-cloud-init-users` nuevo aparecerá en su informe diario.
+
+> Desactivar cloud-init por completo también elimina el riesgo de regeneración, pero no es una decisión que se tome desde esta sección. En algunas plataformas cloud-init participa en la configuración de red, y desactivarlo sin comprobarlo deja el servidor sin conectividad en el siguiente arranque. La comprobación pertinente es si la configuración de red vive en `/etc` o se genera en cada arranque: con un `/etc/netplan/50-cloud-init.yaml` completo, netplan la lee aunque cloud-init esté desactivado y el riesgo desaparece. La sección 5.5 cubre esa verificación.
+
+Retirar `NOPASSWD` del usuario administrativo activa dos mecanismos que hasta entonces estaban dormidos:
+
+- `pam_faillock` pasa a aplicarse a sudo. Con `silent`, un bloqueo se ve igual que una contraseña incorrecta y dura `unlock_time` (10 minutos con la configuración de 7.3.3). El acceso SSH por llave no se ve afectado, porque no pasa por la autenticación de PAM; lo que queda bloqueado es la escalada con sudo.
+- La contraseña del usuario pasa a ser la llave de sudo, y la política de 7.4 la hace vencer a los 90 días. Conviene anotar la fecha de vencimiento (`sudo chage -l "${MIUSUARIO:?}"`) para que el cambio obligatorio no llegue en medio de una intervención.
 
 #### 7.4 Política de contraseñas
 
@@ -1504,8 +1716,8 @@ PASS_WARN_AGE   14
 Estos valores afectan a usuarios creados después del cambio. Para aplicar la política al usuario actual:
 
 ```bash
-sudo chage -M 90 -m 1 -W 14 $MIUSUARIO
-sudo chage -l $MIUSUARIO
+sudo chage -M 90 -m 1 -W 14 "${MIUSUARIO:?}"
+sudo chage -l "${MIUSUARIO:?}"
 ```
 
 Instalar `libpam-pwquality` para exigir contraseñas robustas:
@@ -1599,7 +1811,7 @@ El objetivo de esta sección es:
 - Limitar los algoritmos criptográficos a opciones modernas.
 - Validar y recargar sin perder la sesión activa.
 
-#### 8.1 Archivo modular `/etc/ssh/sshd_config.d/99-hardening.conf`
+#### 8.1 Archivo modular `/etc/ssh/sshd_config.d/01-hardening.conf`
 
 Desde OpenSSH 8.2 (Debian 11 en adelante), `/etc/ssh/sshd_config` incluye al inicio una directiva `Include /etc/ssh/sshd_config.d/*.conf`. Las directivas declaradas en archivos de ese directorio se aplican antes que las del archivo principal, y las primeras ocurrencias ganan. Esto significa que un archivo en `sshd_config.d/` con prefijo numérico bajo (`99-`) toma precedencia sobre el `sshd_config` original sin modificarlo.
 
@@ -1610,18 +1822,28 @@ Ventaja práctica: en una actualización mayor, el `sshd_config` lo reemplaza el
 export MIPUERTO=17177
 export MIUSUARIO=usuario # Ya se definió en 3.2.2
 
-# Descargar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
-wget "${ASSETS_BASE}/plantilla-etc-ssh-sshd_config.d-99-hardening.conf.txt" \
-    -O /tmp/plantilla-etc-ssh-sshd_config.d-99-hardening.conf.txt
-
+# Descargar y aplicar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+: "${ASSETS_BASE:?}" "${MIPUERTO:?}" "${MIUSUARIO:?}" && \
+id "${MIUSUARIO}" > /dev/null && \
+wget "${ASSETS_BASE}/plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt" \
+    -O /tmp/plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt && \
 sed -e "s|\$MIPUERTO|${MIPUERTO}|g" \
     -e "s|\$MIUSUARIO|${MIUSUARIO}|g" \
-    /tmp/plantilla-etc-ssh-sshd_config.d-99-hardening.conf.txt \
-    | sudo tee /etc/ssh/sshd_config.d/99-hardening.conf > /dev/null
+    /tmp/plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt \
+    | sudo tee /etc/ssh/sshd_config.d/01-hardening.conf > /dev/null
 
 # Permisos correctos (recomendado para sshd_config.d)
-sudo chmod 600 /etc/ssh/sshd_config.d/99-hardening.conf
-sudo chown root:root /etc/ssh/sshd_config.d/99-hardening.conf
+sudo chmod 600 /etc/ssh/sshd_config.d/01-hardening.conf
+sudo chown root:root /etc/ssh/sshd_config.d/01-hardening.conf
+```
+
+El `id` de la cadena es la guarda más importante de esta sección. La plantilla escribe `AllowUsers ${MIUSUARIO}` (8.3): con un nombre de usuario mal escrito, el archivo es sintácticamente válido, `sshd -t` lo acepta, y tras recargar SSH nadie puede entrar.
+
+Comprobar los valores efectivos y que no quedó ningún marcador sin sustituir:
+
+```bash
+sudo grep -nE '^(Port|AllowUsers)' /etc/ssh/sshd_config.d/01-hardening.conf
+sudo grep -n '\$MI[A-Z_]*' /etc/ssh/sshd_config.d/01-hardening.conf || echo "✓ plantilla aplicada"
 ```
 
 Una comprobación rápida de que el archivo se parsea sin errores:
@@ -1860,6 +2082,8 @@ La filosofía es:
 
 El firewall se configura antes de activarlo. Activarlo con reglas incorrectas puede cortar la sesión SSH y el servidor queda inaccesible. Por eso esta sección termina con `ufw enable` solo cuando todas las reglas están listas y verificadas.
 
+En un servidor en la nube, UFW no es el único firewall: el del proveedor filtra antes y con sus propias reglas. Las dos capas se mantienen con el mismo contenido, y la del proveedor se documenta en el Anexo C. Conviene leerlo ahora, porque el puerto de SSH que se abre en 9.3 tiene que abrirse también allí.
+
 #### 9.1 Instalación y políticas por defecto
 
 ```bash
@@ -1903,7 +2127,7 @@ sudo ufw limit ${MIPUERTO}/tcp comment 'SSH endurecido con rate limit'
 
 `ufw limit` no reemplaza a fail2ban (sección 10): el rate limit de UFW es de grano fino y temporal; fail2ban banea por minutos u horas con base en patrones de log. Se complementan.
 
-**Servicios web (cuando aplique).** Si el servidor expone web público:
+**Servicios web (cuando aplique).** Si el servicio se va a publicar detrás de un proxy de borde o CDN, estas dos órdenes no se ejecutan. Los puertos se abren ya restringidos a los rangos del borde según 9.6, y así nunca llegan a estar abiertos a todo internet. Si el servidor expone web público directamente, sin nada delante:
 
 ```bash
 sudo ufw allow 80/tcp  comment 'HTTP'
@@ -1982,47 +2206,126 @@ sudo nft list ruleset | less
 ```
 
 UFW genera reglas nftables a partir de su configuración de alto nivel. Esto permite ver exactamente qué está aplicando el kernel.
+
 #### 9.6 Restricción del origen a un proxy de borde o CDN
+
+> **Esta subsección no forma parte del despliegue base.** Se llega a ella desde el manual del proxy inverso, cuando el servicio ya está configurado para publicarse a través del borde. En el despliegue base, UFW queda solo con la regla de SSH de 9.3 y esta subsección se salta. Aplicarla antes no adelanta nada, porque todavía no hay ningún servicio escuchando en el 80 ni en el 443, y deja el resultado a merced del siguiente `ufw allow 80/tcp` que alguien ejecute siguiendo otro manual: UFW no avisa de que una regla abierta convive con las restringidas.
 
 Cuando el servicio web no se publica directamente sino a través de un proxy de borde (un CDN, un WAF gestionado, un balanceador del proveedor), dejar los puertos 80 y 443 abiertos a todo internet anula buena parte del beneficio: quien conozca la IP del servidor puede saltarse el borde y llegar al origen sin pasar por ninguno de sus controles. Y la IP del origen no es un secreto: queda en registros DNS históricos, en cabeceras de correo saliente y en certificados emitidos antes de la migración.
 
-El cierre consiste en aceptar 80 y 443 solo desde los rangos publicados por el proveedor del borde. La lista se descarga de su fuente oficial en lugar de transcribirse, porque cambia:
+El cierre consiste en aceptar esos puertos solo desde los rangos publicados por el proveedor del borde. La misma restricción se aplica en dos sitios, UFW y el firewall del proveedor de nube. Esta subsección cubre el primero; el segundo está en el Anexo C.
+
+##### Variables
 
 ```bash
+export PROVEEDOR_CDN=<proveedor>                        # se usa como comentario de cada regla
 export RANGOS_URL_V4="https://<proveedor>/ips-v4"
 export RANGOS_URL_V6="https://<proveedor>/ips-v6"
-
-# inspeccionar antes de aplicar nada
-curl -s "${RANGOS_URL_V4}"; echo
-curl -s "${RANGOS_URL_V6}"; echo
+export RANGOS_ARCHIVO=/usr/local/etc/rangos-borde.txt   # copia local de la lista aplicada
+export PUERTOS_BORDE="443"                              # "80 443" si el borde también llega por HTTP
 ```
 
-Con la lista revisada, se sustituyen las reglas abiertas por las restringidas. El orden importa: primero se añaden las nuevas, después se retira la antigua, para no quedarse sin servicio entre una orden y la siguiente.
+> Para Cloudflare específicamente se puede utilizar lo siguiente:
+>
+> ```bash
+> export PROVEEDOR_CDN=Cloudflare
+> export RANGOS_URL_V4="https://www.cloudflare.com/ips-v4"
+> export RANGOS_URL_V6="https://www.cloudflare.com/ips-v6"
+> ```
+
+`PUERTOS_BORDE` depende de cómo hable el borde con el origen. Si el borde redirige a HTTPS antes de reenviar, al origen solo llega tráfico por el 443 y el 80 no se abre. Si reenvía en el mismo esquema que usó el visitante y no redirige, hacen falta los dos. El manual del proxy inverso dice cuál es el caso.
+
+##### Descarga y comprobación de la lista
+
+La lista se descarga de la fuente oficial en lugar de transcribirse, porque cambia, y se guarda en un archivo antes de usarla. Iterar directamente sobre la salida de `curl` tiene un fallo silencioso: si la descarga falla, el bucle no añade ninguna regla y las órdenes que vienen después retiran las reglas abiertas igualmente. El resultado es un servidor sin servicio y sin ningún error en pantalla.
 
 ```bash
-for R in $(curl -s "${RANGOS_URL_V4}") $(curl -s "${RANGOS_URL_V6}"); do
-  sudo ufw allow from "${R}" to any port 80  proto tcp comment 'borde CDN'
-  sudo ufw allow from "${R}" to any port 443 proto tcp comment 'borde CDN'
+rm -f /tmp/rangos-v4.txt /tmp/rangos-v6.txt
+curl -fsS "${RANGOS_URL_V4:?}" -o /tmp/rangos-v4.txt
+curl -fsS "${RANGOS_URL_V6:?}" -o /tmp/rangos-v6.txt
+
+for F in /tmp/rangos-v4.txt /tmp/rangos-v6.txt; do
+  if [ -s "${F}" ] && ! grep -qvE '^[0-9a-fA-F:.]+/[0-9]{1,3}$' "${F}"; then
+    echo "✓ ${F}: $(grep -c . "${F}") rangos"
+  else
+    echo "✗ ${F}: vacío o con líneas que no son rangos"
+  fi
+done
+```
+
+Las dos líneas deben empezar por `✓`. Si alguna empieza por `✗`, no se continúa: se abre el archivo, que suele contener una página de error del proveedor en lugar de la lista.
+
+```bash
+{ cat /tmp/rangos-v4.txt; echo; cat /tmp/rangos-v6.txt; echo; } | grep -v '^$' \
+  | sudo tee "${RANGOS_ARCHIVO:?}" > /dev/null
+cat "${RANGOS_ARCHIVO}"
+```
+
+Los `echo` intermedios no son decorativos: la lista de IPv4 puede no terminar en salto de línea, y sin ellos su último rango queda pegado al primero de IPv6. Revisa la salida antes de seguir; es la lista que va a decidir quién llega al servicio.
+
+##### Aplicación
+
+El orden importa: primero se añaden las reglas restringidas y después se retiran las abiertas, para no quedarse sin servicio entre una orden y la siguiente.
+
+```bash
+for R in $(cat "${RANGOS_ARCHIVO:?}"); do
+  for P in ${PUERTOS_BORDE:?}; do
+    sudo ufw allow from "${R}" to any port "${P}" proto tcp comment "${PROVEEDOR_CDN:?}"
+  done
 done
 
 sudo ufw status numbered
-sudo ufw delete allow 80/tcp
-sudo ufw delete allow 443/tcp
-sudo ufw status numbered
 ```
 
-La verificación se hace desde una máquina externa y tiene dos partes. Que el servicio siga respondiendo por su nombre, y que no responda por su IP:
+##### Retiro de las reglas abiertas
+
+Cualquier regla que admita el 80 o el 443 desde un origen que no sea el borde deja el cierre sin efecto. No basta con `ufw delete allow 80/tcp`: esa orden solo borra la regla escrita exactamente así, y deja intactas una regla multipuerto como `80,443/tcp` o una creada con otra forma. Se buscan todas:
+
+```bash
+sudo ufw status numbered | grep -E '(^|[^0-9])(80|443)([^0-9]|$)' | grep -v "${PROVEEDOR_CDN:?}"
+```
+
+Cada línea que devuelva es una regla todavía abierta. Se borran por su número, de mayor a menor, porque al borrar una se renumeran las que le siguen:
+
+```bash
+sudo ufw delete <número>
+```
+
+La búsqueda se repite hasta que no devuelva nada. En un servidor donde esos puertos nunca se abrieron a internet, que es lo que ocurre cuando se sigue el orden que marca el manual del proxy inverso para un sitio nuevo, no hay nada que retirar.
+
+> **Si el servicio ya estaba publicado directamente, no retires las reglas abiertas antes de comprobar que el borde funciona.** Si el proxy todavía no está sirviendo correctamente y cierras el origen, te quedas sin ruta de acceso al servicio. Añadir las reglas restringidas no tiene ese riesgo; retirar las abiertas, sí.
+
+##### Verificación
+
+Se hace desde una máquina externa y tiene dos partes. Que el servicio siga respondiendo por su nombre, y que no responda por su IP:
 
 ```bash
 curl -sI https://<dominio> | head -3
-curl -m 5 -I -H "Host: <dominio>" http://<ip-publica-del-origen>
+nc -zv -w 5 <ip-publica-del-origen> 443
+nc -zv -w 5 <ip-publica-del-origen> 80
 ```
 
-La primera orden debe funcionar. La segunda debe agotar el tiempo de espera.
+La primera orden debe responder. Las otras dos deben agotar el tiempo de espera. Si alguna devuelve `connection refused` o llega a conectar, el puerto sigue alcanzable desde fuera del borde y hay que revisar las reglas de aquí y las del Anexo C.
 
-> **No apliques esto antes de comprobar que el borde funciona.** Si el proxy todavía no está sirviendo correctamente y cierras el origen, te quedas sin ruta de acceso al servicio. El puerto de SSH no debe incluirse en esta restricción, porque no pasa por el borde: se administra con su propia regla y por la IP del origen, no por el nombre de dominio.
+> El puerto de SSH no se incluye en esta restricción, porque no pasa por el borde: se administra con su propia regla y por la IP del origen, no por el nombre de dominio. Antes de terminar, anota esa IP y comprueba que entras por SSH usándola. Con el borde activo, el nombre del dominio ya no resuelve al servidor.
 
-> Esta regla no alcanza a los puertos publicados por contenedores. El demonio de contenedores inserta sus propias reglas en cadenas que UFW no gobierna, de modo que un puerto publicado por un contenedor queda accesible aunque UFW diga lo contrario. Ese filtrado se resuelve en el firewall del proveedor o en la cadena que el propio demonio respeta, y se documenta en el manual del rol correspondiente.
+> Estas reglas no alcanzan a los puertos publicados por contenedores. El demonio de contenedores inserta sus propias reglas en cadenas que UFW no gobierna, de modo que un puerto publicado por un contenedor queda accesible aunque UFW diga lo contrario. Ese filtrado se resuelve en el firewall del proveedor, según el Anexo C.
+
+##### Mantenimiento de la lista
+
+Los rangos cambian pocas veces, pero cambian, y la lista queda copiada en tres sitios: estas reglas de UFW, el firewall del proveedor de nube y la declaración de proxies confiables del proxy inverso. Los síntomas de olvidar cada uno son distintos. Un rango nuevo que falte en cualquiera de los dos firewalls corta el servicio para la parte de los visitantes que el borde encamine por él. Uno que falte en el proxy inverso no corta nada y ensucia los registros de acceso durante meses.
+
+La comprobación compara la lista publicada con la copia aplicada, y es apta para una revisión mensual:
+
+```bash
+{ curl -fsS "${RANGOS_URL_V4:?}"; echo; curl -fsS "${RANGOS_URL_V6:?}"; echo; } \
+  | grep -v '^$' | sort > /tmp/rangos-hoy.txt
+
+[ -s /tmp/rangos-hoy.txt ] && sort "${RANGOS_ARCHIVO:?}" | diff - /tmp/rangos-hoy.txt \
+  && echo "✓ sin cambios" || echo "✗ la lista cambió o no se pudo descargar"
+```
+
+Las líneas que `diff` marca con `>` son rangos nuevos y las que marca con `<` son rangos retirados. Ante un cambio se repite esta subsección desde la descarga y se actualizan los otros dos sitios en la misma sesión. Los rangos retirados se borran por número al final, cuando los nuevos ya están aplicados.
 
 ### 10. Protección contra fuerza bruta (fail2ban)
 
@@ -2047,13 +2350,16 @@ fail2ban distribuye su configuración en `/etc/fail2ban/jail.conf`. Ese archivo 
 ```bash
 export MIPUERTO=17177 # Definido en 8.1
 
-# Descargar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar y aplicar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+: "${ASSETS_BASE:?}" "${MIPUERTO:?}" && \
 wget "${ASSETS_BASE}/plantilla-etc-fail2ban-jail.local.txt" \
-    -O /tmp/plantilla-etc-fail2ban-jail.local.txt
-
+    -O /tmp/plantilla-etc-fail2ban-jail.local.txt && \
 sed -e "s|\$MIPUERTO|${MIPUERTO}|g" \
     /tmp/plantilla-etc-fail2ban-jail.local.txt \
     | sudo tee /etc/fail2ban/jail.local > /dev/null
+
+# Comprobar que no quedó ningún marcador sin sustituir
+sudo grep -n '\$MI[A-Z_]*' /etc/fail2ban/jail.local || echo "✓ plantilla aplicada"
 
 # Permisos correctos 
 sudo chmod 640 /etc/fail2ban/jail.local
@@ -2155,10 +2461,10 @@ Los parámetros `sysctl` modifican comportamiento del kernel en caliente. Las mo
 #### 11.1 Parámetros sysctl de red y de kernel
 
 ```bash
-# Descargar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+: "${ASSETS_BASE:?}" && \
 wget "${ASSETS_BASE}/plantilla-etc-sysctl.d-99-hardening.conf.txt" \
-    -O /tmp/plantilla-etc-sysctl.d-99-hardening.conf.txt
-
+    -O /tmp/plantilla-etc-sysctl.d-99-hardening.conf.txt && \
 sudo cp /tmp/plantilla-etc-sysctl.d-99-hardening.conf.txt /etc/sysctl.d/99-hardening.conf
 ```
 
@@ -2190,6 +2496,14 @@ sudo sysctl net.ipv4.tcp_syncookies
 
 En Debian 13, varios de estos parámetros ya tienen valores razonables por defecto. El archivo `99-hardening.conf` los fija explícitamente para que el endurecimiento no dependa de defaults futuros.
 
+> **Roles que reenvían paquetes.** Contenedores, virtualización y VPN necesitan `net.ipv4.ip_forward = 1`, y sus demonios lo activan al arrancar. Si algún archivo de este servidor lo fija en `0`, un `sysctl --system` ejecutado con el rol ya en marcha lo vuelve a apagar: los contenedores pierden la red y ningún servicio aparece como fallido. Antes de instalar un rol de ese tipo, comprueba qué hay escrito:
+>
+> ```bash
+> grep -rn "ip_forward" /etc/sysctl.d/ /etc/sysctl.conf 2>/dev/null
+> ```
+>
+> Si aparece fijado en `0`, el manual del rol lo anula en un archivo propio que se lea después, por ejemplo `/etc/sysctl.d/99-zz-reenvio.conf`, en lugar de editar la plantilla.
+
 #### 11.2 Límites de recursos (`/etc/security/limits.conf`)
 
 `limits.conf` define límites de procesos, memoria, archivos abiertos, etc. para usuarios y sesiones. En un servidor base, los defaults son aceptables. Conviene ajustar dos cosas:
@@ -2215,16 +2529,25 @@ Los core dumps son útiles para depurar, pero en producción su valor es bajo y 
 Cada módulo cargado es código ejecutándose en kernel space. Los módulos no usados son superficie de ataque gratuita. En un servidor, varios buses y filesystems no se necesitan nunca.
 
 ```bash
-# Descargar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+: "${ASSETS_BASE:?}" && \
 wget "${ASSETS_BASE}/plantilla-etc-modprobe.d-99-hardening.conf.txt" \
-    -O /tmp/plantilla-etc-modprobe.d-99-hardening.conf.txt
-
+    -O /tmp/plantilla-etc-modprobe.d-99-hardening.conf.txt && \
 sudo cp /tmp/plantilla-etc-modprobe.d-99-hardening.conf.txt /etc/modprobe.d/99-hardening.conf
 ```
 
 `install <modulo> /bin/true` hace que cualquier intento de cargar el módulo ejecute `/bin/true` (que termina con éxito sin hacer nada). Más limpio que `blacklist`, que solo evita la carga automática pero permite la carga explícita.
 
-> Bloquear `udf` impide montar ISOs y medios ópticos. Irrelevante en un servidor de aplicaciones; no así en un host de virtualización. Si el rol lo necesita, comentar esa línea y anotarlo en el runbook (§19.3).
+> **Roles con contenedores.** Su red depende de módulos que una lista de bloqueo genérica puede incluir. Antes de instalar un motor de contenedores, comprueba que la plantilla no bloquee ninguno de los habituales:
+>
+> ```bash
+> grep -nE 'overlay|br_netfilter|bridge|veth|vxlan|ip_vs' /etc/modprobe.d/99-hardening.conf \
+>   || echo "✓ ninguno bloqueado"
+> ```
+>
+> Un módulo bloqueado con `install <modulo> /bin/true` no produce ningún error al cargarse: el demonio cree que lo tiene y la red del contenedor simplemente no funciona.
+
+> Bloquear `udf` impide montar ISOs y medios ópticos. Irrelevante en un servidor de aplicaciones; no así en un host de virtualización. Si el rol lo necesita, comentar esa línea y anotarlo en el runbook (§20.3).
 
 > **Especial cuidado con USB storage en servidores físicos donde el operador usa pendrives administrativos.** No deshabilitar `usb-storage` si se necesita conectar discos externos para respaldos. En servidores de colocation o data center, donde nadie debería conectar nada físicamente, sí tiene sentido bloquearlo:
 >
@@ -2303,10 +2626,10 @@ sudo systemctl enable --now auditd
 **Reglas básicas:**
 
 ```bash
-# Descargar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+: "${ASSETS_BASE:?}" && \
 wget "${ASSETS_BASE}/plantilla-etc-audit-rules.d-99-hardening.rules.txt" \
-    -O /tmp/plantilla-etc-audit-rules.d-99-hardening.rules.txt
-
+    -O /tmp/plantilla-etc-audit-rules.d-99-hardening.rules.txt && \
 sudo cp /tmp/plantilla-etc-audit-rules.d-99-hardening.rules.txt /etc/audit/rules.d/99-hardening.rules
 ```
 
@@ -2323,8 +2646,8 @@ Dos comportamientos que de otro modo parecen fallas. `augenrules` no respeta la 
 Comprobar el resultado efectivo, que es lo único que vale:
 
 ```bash
-head -4 /etc/audit/audit.rules   # -D, -b y -f reubicados al inicio
-tail -1 /etc/audit/audit.rules   # -e 2 al final
+sudo head -4 /etc/audit/audit.rules   # -D, -b y -f reubicados al inicio
+sudo tail -1 /etc/audit/audit.rules   # -e 2 al final
 sudo auditctl -s                 # enabled=2, failure=1
 ```
 
@@ -2352,7 +2675,7 @@ sudo apt install -y rkhunter
 
 # Crear/agregar overrides locales
 sudo tee -a /etc/rkhunter.conf.local > /dev/null <<'EOF'
-# Override: PermitRootLogin está en sshd_config.d/99-hardening.conf
+# Override: PermitRootLogin está en sshd_config.d/01-hardening.conf
 ALLOW_SSH_ROOT_USER=unset
 ALLOW_SSH_PROT_V1=2
 
@@ -2439,6 +2762,16 @@ sudo apt install -y aide aide-common
 
 El paquete `aide` provee el binario; `aide-common` provee el archivo de configuración base (`/etc/aide/aide.conf`), el script de inicialización (`aideinit`) y el job diario (`/usr/share/aide/bin/dailyaidecheck`).
 
+> **Almacenamiento de contenedores.** Si el servidor corre contenedores, su almacenamiento cambia en cada despliegue y no es un árbol que AIDE deba vigilar: las capas de imagen y los volúmenes llenan el reporte diario de diferencias legítimas hasta volverlo ilegible. Se excluye con una regla propia antes de generar la base, y se comprueba que la configuración sigue siendo válida:
+>
+> ```bash
+> printf '%s\n' '!/var/lib/docker' '!/var/lib/containerd' \
+>   | sudo tee /etc/aide/aide.conf.d/70_local_contenedores > /dev/null
+> sudo aide --config /etc/aide/aide.conf --config-check && echo "✓ configuración válida"
+> ```
+>
+> El nombre del archivo solo admite letras, números, guiones y guiones bajos; con un punto, AIDE lo ignora sin avisar. La integridad de lo que corre dentro de los contenedores se controla por otra vía, fijando cada imagen por su resumen criptográfico, y lo documenta el manual del rol.
+
 ##### Inicialización de la base de datos
 
 El comando `aideinit` genera la base de datos inicial recorriendo todo el sistema y calculando hashes. Tarda entre **2 y 10 minutos** dependiendo del tamaño del sistema:
@@ -2459,7 +2792,7 @@ La base recién creada queda en `/var/lib/aide/aide.db.new`. Para que AIDE la us
 sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
 ```
 
-> **Nota sobre la compresión**: la configuración por defecto de Debian 13 incluye `gzip_dbout=yes`, lo que significa que la base de datos se genera **comprimida con gzip aunque el archivo no tenga la extensión `.gz`**. Esto es normal y AIDE la lee correctamente. Se puede verificar con `sudo file /var/lib/aide/aide.db`, que reportará `gzip compressed data`.
+> **Nota sobre la compresión**: la configuración por defecto de Debian 13 incluye `gzip_dbout=yes`, lo que significa que la base de datos se genera comprimida con gzip aunque el archivo no tenga la extensión `.gz`. Esto es normal y AIDE la lee correctamente. Se puede verificar con `sudo file /var/lib/aide/aide.db`, que reportará `gzip compressed data`.
 
 ##### Verificación de la base de datos
 
@@ -2611,9 +2944,9 @@ sudo chmod 700 /etc/cron.monthly/lynis-audit
 sudo chown root:root /etc/cron.monthly/lynis-audit
 ```
 
-La opción `--cronjob` suprime la salida interactiva; `--quiet` elimina el progreso visual. El reporte llega por correo a root (y por lo tanto al destino externo configurado en el Anexo C).
+La opción `--cronjob` suprime la salida interactiva; `--quiet` elimina el progreso visual. El reporte llega por correo a root (y por lo tanto al destino externo configurado en la sección 19).
 
-> El envío no usa `mail -s asunto root` por la razón documentada en C.9: GNU
+> El envío no usa `mail -s asunto root` por la razón documentada en 19.9: GNU
 > Mailutils invoca `/usr/sbin/sendmail -t` sin pasarle el destinatario posicional,
 > de modo que msmtp nunca llega a ejecutarse y el correo se pierde en silencio. La
 > forma confiable es construir las cabeceras `To:` y `Subject:` y entregárselas a
@@ -2755,7 +3088,7 @@ Tres principios atraviesan esta parte:
 
 2. El reinicio automático es un compromiso, no un dogma. Reiniciar para aplicar parches del kernel es necesario; reiniciar a mitad de jornada es destructivo. Esta parte propone ventanas horarias y banderas explícitas para que el comportamiento sea predecible.
 
-3. Probar la restauración antes de necesitarla. Un respaldo que nunca se restauró no es un respaldo, es una esperanza. La sección 17 incluye prueba periódica de restauración como parte del flujo, no como recomendación opcional.
+3. Probar la restauración antes de necesitarla. Un respaldo que nunca se restauró no es un respaldo, es una esperanza. La sección 18 incluye prueba periódica de restauración como parte del flujo, no como recomendación opcional.
 
 ### 14. Actualizaciones automáticas
 
@@ -2800,6 +3133,14 @@ Significado:
 
 Aplicar `updates` además de `security` mantiene el servidor más al día (correcciones funcionales, no solo de seguridad), a cambio de mayor superficie de cambio entre reinicios. Es una decisión defendible para servidores administrados activamente. Para servidores donde la estabilidad importa más que la frescura, dejar solo `security` es válido — basta con comentar las líneas que no aplican.
 
+> **Los repositorios de terceros quedan fuera.** Estos patrones solo cubren los orígenes de Debian. Un paquete instalado desde un repositorio externo —un motor de contenedores, un proxy inverso, una base de datos empaquetada por su proveedor— no se actualiza solo, y eso incluye sus parches de seguridad. No conviene corregirlo a ciegas: en varios de esos paquetes la actualización reinicia el servicio, y hacerlo sin ventana puede ser peor que hacerlo unos días tarde. La decisión se toma por paquete en el manual del rol, y tiene dos salidas: añadir su origen a esta lista, o anotar su actualización como tarea periódica con responsable. Los valores para la primera se leen de la política de apt:
+>
+> ```bash
+> apt-cache policy | grep -oE 'o=[^,]+' | sort -u
+> ```
+>
+> Cada `o=<valor>` es un origen, y la línea que se añade tiene la forma `"origin=<valor>";`.
+
 ##### 14.2.1 Lista de paquetes excluidos
 
 `unattended-upgrades` permite excluir paquetes específicos del flujo automático. Esto es útil para paquetes que requieren intervención manual al actualizarse (por ejemplo, bases de datos en producción, donde el reinicio del servicio debe coordinarse).
@@ -2833,7 +3174,7 @@ Significado:
 - `Mail "root"` — envía el reporte al usuario `root` local. Si el servidor tiene un MTA configurado para reenviar el correo de root a una dirección externa, llega ahí.
 - `MailReport "on-change"` — solo envía correo cuando hubo actualizaciones aplicadas o errores. Las opciones son `always` (siempre, ruidoso), `only-on-error` (solo errores, demasiado silencioso) y `on-change` (equilibrio razonable).
 
-Para que el correo a root sea útil, hay que asegurar que se reenvía a una dirección real. Esto se cubre en la sección 17 (monitoreo) con la configuración de un MTA mínimo. Mientras tanto, el correo queda en `/var/mail/root` y se puede leer con `mail` desde el servidor.
+Para que el correo a root sea útil, hay que asegurar que se reenvía a una dirección real. Esto se cubre en la sección 19, con la configuración de un MTA mínimo. Mientras tanto, el correo queda en `/var/mail/root` y se puede leer con `mail` desde el servidor.
 
 #### 14.4 Reinicio automático controlado
 
@@ -3276,27 +3617,52 @@ sudo systemctl restart systemd-journald
 Esta sección no es referencia exhaustiva de `journalctl` (la documentación es excelente: `man journalctl`), pero sí los patrones más comunes en operación:
 
 ```bash
-# Logs del arranque actual
-sudo journalctl -b
+# Arranques registrados (requisito para usar -b -N)
+sudo journalctl --list-boots
 
-# Logs del arranque anterior
-sudo journalctl -b -1
+# Logs del arranque actual, saltando al final
+sudo journalctl -b -e
+
+# Logs del arranque anterior, saltando al final
+sudo journalctl -b -1 -e
 
 # Logs de un servicio específico
 sudo journalctl -u ssh -n 100
 
-# Logs en tiempo real
+# Logs en tiempo real (se interrumpe con Ctrl+C)
 sudo journalctl -f
 
-# Logs desde una fecha
-sudo journalctl --since "2026-05-20" --until "2026-05-21"
+# Logs por periodo, con expresiones relativas
+sudo journalctl --since today
+sudo journalctl --since yesterday --until today
+sudo journalctl --since "1 hour ago"
 
-# Solo errores y peor
-sudo journalctl -p err
+# Solo errores y peor, del arranque actual
+sudo journalctl -b -p err
 
-# Verificar integridad del journal (importante para auditoría)
+# Consistencia estructural de los archivos del journal
 sudo journalctl --verify
 ```
+
+Algunas precisiones que evitan interpretaciones erróneas:
+
+- `-e` salta al final del paginador. En operación casi siempre interesa lo último que ocurrió, no el mapa de memoria del firmware con el que empieza cada arranque. En `-f` no hay paginador: la tecla `q` no hace nada y se sale con Ctrl+C.
+- `-b -1` necesita que exista un arranque anterior registrado. En un servidor que no ha reiniciado desde que el journal es persistente, devuelve `No journal boot entry found for the specified boot (-1)`, y es lo esperado. Por eso conviene consultar antes `--list-boots`.
+- Las expresiones relativas (`today`, `yesterday`, `"1 hour ago"`) funcionan en cualquier servidor y en cualquier momento. Con fechas absolutas hay que tener en cuenta que una fecha sin hora equivale a las 00:00: `--until "2026-09-26"` excluye todo lo ocurrido ese día. Si hace falta un día completo, indicar la hora (`--until "2026-09-26 23:59:59"`).
+- Los nombres de mes siguen el locale configurado en la sección 5.4. Con `es_PE.UTF-8`, septiembre aparece como `set` (de "setiembre"). Para scripts que procesen la salida, usar `-o short-iso`, que no depende del idioma.
+- En un servidor recién desplegado, `-b -p err` debería estar vacío una vez enmascarado el generador de la sección 2.5.2. Cualquier entrada que aparezca merece atención.
+- Si el usuario administrativo pertenece al grupo `adm` (7.2), `journalctl` lee el journal completo sin `sudo`; si no, solo ve sus propias entradas. Los ejemplos usan `sudo` para que el resultado no dependa de eso. La excepción de `log_output` de la sección 7.3.1 evita que cada consulta con `sudo` se duplique en `/var/log/sudo-io/`.
+
+> **Nota:** `--verify` comprueba que los archivos del journal son estructuralmente consistentes, no que nadie los haya alterado. Un `PASS` no es evidencia de integridad frente a un atacante con root. Para eso existe Forward Secure Sealing (FSS): `journalctl --setup-keys` genera una clave de sellado que queda en el servidor y una clave de verificación que se guarda fuera de él, y `journalctl --verify --verify-key=<clave>` comprueba los sellos. `Seal=yes` es el valor por defecto de `journald.conf`, pero solo tiene efecto si existen las claves. FSS no se configura en este manual base; es una opción a evaluar en servidores con requisitos de auditoría.
+
+La persistencia del journal solo queda demostrada cuando un arranque sobrevive al siguiente. Para cerrar esta sección conviene un reinicio controlado; después, `--list-boots` debe mostrar al menos dos entradas, y `sudo journalctl -b -1 -e` debe terminar con un apagado limpio:
+
+```
+systemd-journald[...]: Received SIGTERM from PID 1 (systemd-shutdow).
+systemd-journald[...]: Journal stopped
+```
+
+El mismo reinicio sirve para confirmar que el resto de la configuración aplicada hasta aquí (puerto SSH, UFW, chrony) también sobrevive, con el mismo criterio de la sección 5.5.8.
 
 #### 16.2 `logrotate` para logs de aplicaciones
 
@@ -3353,6 +3719,26 @@ sudo logrotate -f /etc/logrotate.d/miapp     # fuerza la rotación ahora
 sudo systemctl status logrotate.timer --no-pager
 ```
 
+##### 16.2.1 Sesiones de `sudo` en `/var/log/sudo-io/`
+
+La directiva `log_output` de la sección 7.3.1 graba en `/var/log/sudo-io/` la salida de cada orden ejecutada con sudo. Ese directorio no lo gestiona `logrotate` ni tiene rotación propia: crece de forma continua y sin límite. La excepción de `journalctl` en 7.3.1 elimina la fuente de crecimiento más grande, pero el resto de sesiones sigue acumulándose.
+
+La retención se fija con una regla de `systemd-tmpfiles`:
+
+```bash
+echo 'e /var/log/sudo-io - - - 90d' | sudo tee /etc/tmpfiles.d/sudo-io.conf > /dev/null
+sudo systemd-tmpfiles --clean /etc/tmpfiles.d/sudo-io.conf
+sudo systemctl status systemd-tmpfiles-clean.timer --no-pager
+```
+
+El tipo `e` con `-` en modo, usuario y grupo no cambia permisos ni propietarios: solo borra por antigüedad el contenido del directorio. `systemd-tmpfiles-clean.timer` aplica la regla a diario, y que `--clean` no devuelva nada es lo normal. Los 90 días están alineados con `MaxRetentionSec=3month` del journal (16.1.1). Estas sesiones son evidencia de auditoría, así que si la organización exige más retención, ajustar ambos valores a la vez, con el criterio de la sección 16.5.
+
+El contador de sesiones de sudo no se reinicia al borrar las antiguas, así que `sudoreplay` sigue funcionando con las que quedan:
+
+```bash
+sudo sudoreplay -l | tail -5     # últimas sesiones grabadas
+```
+
 #### 16.3 Reenvío a un servidor central (opcional)
 
 Para infraestructuras con múltiples servidores, conviene enviar los logs a un servidor central de log management. Las dos opciones más comunes son:
@@ -3370,13 +3756,15 @@ sudo du -sh /var/log/* | sort -h
 sudo journalctl --disk-usage
 ```
 
-El primer comando muestra el espacio del filesystem `/var/log`. El segundo muestra qué directorios consumen más espacio. El tercero muestra cuánto usa el journal específicamente.
+El primer comando muestra el espacio del filesystem `/var/log`. El segundo muestra qué directorios consumen más espacio; entre ellos conviene vigilar `/var/log/sudo-io`, que no depende ni de journald ni de logrotate. El tercero muestra cuánto usa el journal específicamente.
 
 Si `/var/log` está cerca de llenarse, las opciones son:
 
 - Reducir `SystemMaxUse` y `MaxRetentionSec` en journald.
 - Reducir el número de archivos rotados en logrotate.
+- Acortar la retención de `/var/log/sudo-io/` (16.2.1) o excluir de `log_output` otros comandos de salida voluminosa, con el mismo patrón que `journalctl` en 7.3.1.
 - Ampliar el LV `/var/log` con `lvresize` (si se configuró LVM en la sección 2.2).
+
 #### 16.5 Retención frente a necesidad forense
 
 La configuración de rotación de las subsecciones anteriores está calibrada para dos objetivos que no son el mismo: que el disco no se llene, y que haya contexto suficiente para diagnosticar un problema en curso. Ninguno de los dos garantiza que los registros sigan ahí cuando haga falta reconstruir algo que ocurrió hace una semana.
@@ -3470,12 +3858,11 @@ A partir de ahí, `sar` muestra estadísticas históricas (CPU, memoria, disco, 
 Para alertas básicas sin instalar herramientas complejas, un script en `/etc/cron.hourly/` que verifica condiciones críticas y envía correo si algo está mal es suficiente.
 
 ```bash
-# Descargar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+: "${ASSETS_BASE:?}" && \
 wget "${ASSETS_BASE}/plantilla-etc-cron.hourly-server-check.txt" \
-    -O /tmp/plantilla-etc-cron.hourly-server-check.txt
-
-sudo mkdir -p /etc/cron.hourly/
-
+    -O /tmp/plantilla-etc-cron.hourly-server-check.txt && \
+sudo mkdir -p /etc/cron.hourly/ && \
 sudo cp /tmp/plantilla-etc-cron.hourly-server-check.txt /etc/cron.hourly/server-check
 ```
 
@@ -3489,7 +3876,7 @@ sudo chown root:root /etc/cron.hourly/server-check
 
 Adaptar la lista de servicios críticos según el rol del servidor. En un servidor de mail, añadir `postfix` y `dovecot`. En un web server, `nginx` o `apache2`.
 
-Para que el correo a root llegue a una dirección externa, el servidor necesita un MTA local configurado para reenvío. La opción más simple es `msmtp` o `bsd-mailx` con un relay SMTP autenticado. La configuración detallada del MTA pertenece al manual de mail server cuando aplique; en este manual base hay una referencia más detallada en el Anexo C.
+Para que el correo a root llegue a una dirección externa, el servidor necesita un MTA local configurado para reenvío. La opción más simple es `msmtp` o `bsd-mailx` con un relay SMTP autenticado. La configuración de ese reenvío está en la sección 19. Un servidor de correo completo, que además recibe, pertenece a su propio manual.
 
 #### 17.3 Estado de servicios críticos
 
@@ -3800,7 +4187,267 @@ Procedimiento de alto nivel para reconstruir el servidor si se pierde completame
 
 Este procedimiento debe estar documentado en un runbook accesible incluso si el servidor está caído (en otro sistema, en papel, en el gestor de contraseñas del equipo).
 
-### 19. Documentación operativa
+### 19. Reenvío de correo del sistema con `msmtp`
+
+`unattended-upgrades` (14.3), `rkhunter`, `debsums`, `aide` (12) y el script de alertas (17.2) envían correo a `root`. Sin configuración adicional, esos mensajes quedan en `/var/mail/root`, donde casi nadie los lee. Esta sección reenvía el correo de cualquier usuario local a una dirección externa mediante un relay SMTP autenticado. El servidor solo envía; no recibe. Se usa `msmtp` porque es solo un transmisor: sin demonio en escucha ni cola propia.
+
+#### 19.1 Decisiones de diseño
+
+- Aliases en `/etc/msmtp/aliases`, no en `/etc/aliases`: msmtp no lee el archivo tradicional, y sin traducción el relay rechaza destinatarios como `root`.
+- Logs en journald (sección 16.1), no en archivo dedicado: evita problemas de permisos con usuarios no-root y no requiere logrotate.
+- Gmail con app password como ejemplo concreto (19.4.1). Outlook/Hotmail personales quedan fuera porque exigen XOAUTH2.
+
+#### 19.2 Requisitos previos
+
+- Relay SMTP con autenticación estándar (corporativo, Mailgun, Brevo, Amazon SES, Gmail).
+- Usuario y contraseña del relay.
+- Dirección `From` autorizada en el relay.
+- Dirección de destino para el correo del sistema.
+
+#### 19.3 Instalación
+
+```bash
+sudo apt install -y msmtp msmtp-mta mailutils
+```
+
+`msmtp-mta` convierte `/usr/sbin/sendmail` en un enlace a msmtp, de modo que cron y cualquier programa que use `sendmail` envían por msmtp. `mailutils` aporta el comando `mail`.
+
+##### 19.3.1 Retiro de `exim4` y `bsd-mailx`
+
+La sección 12.2 instala `rkhunter`, cuyas Recommends traen `exim4` (como `default-mta`) y `bsd-mailx`. Al instalar `msmtp-mta`, apt retira los tres paquetes de `exim4`, pero los deja en estado `rc` con su configuración en `/etc/exim4/`. `bsd-mailx`, por su parte, tiene prioridad 50 frente a 30 de `mailutils` en la alternativa `mailx`, así que `/usr/bin/mail` seguiría apuntando a él. Como `mailutils` ya satisface la recomendación de `rkhunter`, se retiran ambos:
+
+```bash
+sudo apt -y purge exim4-base exim4-config exim4-daemon-light bsd-mailx
+sudo apt -y autoremove --purge
+```
+
+> `autoremove` ejecutado antes de instalar `msmtp-mta` no retira nada: mientras `exim4` sea el único MTA, apt lo considera necesario. El buzón `/var/mail/root` se conserva; conviene revisarlo una vez con `sudo less /var/mail/root`.
+
+Verificar:
+
+```bash
+dpkg -l 'exim4*' | grep -E '^(ii|rc)' || echo "exim4 eliminado por completo"
+readlink -f /usr/sbin/sendmail
+readlink -f /usr/bin/mail
+sudo ss -tlnp | grep ':25\b' || echo "nada escucha en el puerto 25"
+```
+
+Salida esperada:
+
+```
+exim4 eliminado por completo
+/usr/bin/msmtp
+/usr/bin/mail.mailutils
+nada escucha en el puerto 25
+```
+
+#### 19.4 Configuración global de msmtp
+
+La variable del puerto se llama `MIPUERTO_SMTP` para no pisar `MIPUERTO`, que es el puerto SSH (sección 8). `ASSETS_BASE` se define en la Parte I.
+
+```bash
+export MIRELAY=smtp.relay.example.com
+export MIPUERTO_SMTP=587
+export MIUSUARIO_SMTP=notificaciones@example.com
+export MIFROM=notificaciones@example.com
+
+: "${ASSETS_BASE:?}" "${MIRELAY:?}" "${MIPUERTO_SMTP:?}" "${MIUSUARIO_SMTP:?}" "${MIFROM:?}" && \
+wget "${ASSETS_BASE}/plantilla-etc-msmtprc.txt" -O /tmp/plantilla-etc-msmtprc.txt && \
+sed -e "s|\$MIRELAY|${MIRELAY}|g" \
+    -e "s|\$MIPUERTO_SMTP|${MIPUERTO_SMTP}|g" \
+    -e "s|\$MIUSUARIO_SMTP|${MIUSUARIO_SMTP}|g" \
+    -e "s|\$MIFROM|${MIFROM}|g" \
+    /tmp/plantilla-etc-msmtprc.txt \
+    | sudo tee /etc/msmtprc > /dev/null
+
+# Comprobar que no quedó ningún marcador sin sustituir
+sudo grep -n '\$MI[A-Z_]*' /etc/msmtprc || echo "✓ plantilla aplicada"
+
+sudo chmod 0640 /etc/msmtprc
+sudo chown root:msmtp /etc/msmtprc
+```
+
+Fijar el remitente. mailutils pasa a sendmail su propio remitente (`-f usuario@FQDN`), que un relay estricto rechaza; `allow_from_override off` obliga a msmtp a usar siempre el `from` configurado. La plantilla v1.2 ya lo incluye; con versiones anteriores se añade así (el comando es idempotente):
+
+```bash
+sudo grep -q '^allow_from_override' /etc/msmtprc || sudo sed -i '/^aliases/a allow_from_override off' /etc/msmtprc
+```
+
+> `allow_from_override` fija el remitente del envelope. Si el relay valida también la cabecera `From:` (Amazon SES y algunos corporativos lo hacen; Gmail la reescribe por su cuenta), añadir además `set_from_header on` en el bloque `defaults`.
+
+##### 19.4.1 Caso particular: Gmail con app password
+
+```bash
+export MIRELAY=smtp.gmail.com
+export MIPUERTO_SMTP=587
+export MIUSUARIO_SMTP=tu-cuenta@gmail.com
+export MIFROM=tu-cuenta@gmail.com
+```
+
+1. Activar la verificación en dos pasos en <https://myaccount.google.com/security>.
+2. Generar una app password en <https://myaccount.google.com/apppasswords> con un nombre descriptivo (ej. `msmtp-mandarina`). Se muestra una sola vez: guardarla en el gestor de contraseñas.
+3. Usar esa clave de 16 caracteres en 19.5.
+
+Gmail limita las cuentas gratuitas a 500 destinatarios diarios, irrelevante para alertas. La app password da acceso completo a la cuenta; es preferible una cuenta dedicada solo a notificaciones.
+
+#### 19.5 Contraseña del relay
+
+```bash
+sudo install -d -o root -g msmtp -m 0750 /etc/msmtp
+printf '%s' 'la-contraseña-o-app-password' | sudo tee /etc/msmtp/password > /dev/null
+sudo chmod 0640 /etc/msmtp/password
+sudo chown root:msmtp /etc/msmtp/password
+sudo ls -la /etc/msmtp/
+```
+
+`printf '%s'` evita el salto de línea final que añadiría `echo`. Salida esperada:
+
+```
+drwxr-x--- 2 root msmtp 4096 ... .
+-rw-r----- 1 root msmtp   XX ... password
+```
+
+#### 19.6 Aliases para destinatarios locales
+
+```bash
+export MIDESTINO=admin@example.com
+
+sudo tee /etc/msmtp/aliases > /dev/null <<EOF
+# Aliases de msmtp: <local>: <externa>
+root: ${MIDESTINO:?}
+default: ${MIDESTINO}
+EOF
+
+sudo chmod 0644 /etc/msmtp/aliases
+sudo chown root:root /etc/msmtp/aliases
+sudo grep '^aliases' /etc/msmtprc
+```
+
+`default:` captura cualquier otro usuario local (`postmaster`, `daemon`, cuentas de servicio). El `grep` debe devolver `aliases         /etc/msmtp/aliases`; si no aparece:
+
+```bash
+sudo sed -i '/^timeout/a aliases         /etc/msmtp/aliases' /etc/msmtprc
+```
+
+El perfil de AppArmor que msmtp trae en Debian 13 está en modo enforce y no permite leer `/etc/msmtp/aliases`. Sin este override, todo envío a un destinatario local falla con `Permiso denegado` y exit 78. La denegación no aparece ni en `journalctl -k` ni en `ausearch`.
+
+```bash
+echo '/etc/msmtp/aliases r,' | sudo tee -a /etc/apparmor.d/local/usr.bin.msmtp > /dev/null
+sudo apparmor_parser -r /etc/apparmor.d/usr.bin.msmtp
+```
+
+#### 19.7 Configuración de mailutils
+
+```bash
+sudo tee /etc/mail.rc > /dev/null <<'EOF'
+set sendmail="sendmail:///usr/sbin/sendmail"
+set sendwait
+EOF
+```
+
+En mailutils, `sendmail` es una URL de mailer, no una ruta. Con la ruta a secas (`/usr/sbin/sendmail`), mailutils ejecuta el programa sin pasarle destinatarios y msmtp responde `no se encontraron destinatarios`. `sendwait` hace que `mail` espere el resultado y muestre los errores.
+
+#### 19.8 Grupo `msmtp` para el usuario administrativo
+
+Permite enviar correo de prueba sin `sudo`. Los servicios del sistema corren como root y no lo necesitan.
+
+```bash
+sudo usermod -aG msmtp "${MIUSUARIO:?}"
+exit
+# Reconectar por SSH
+id -nG | grep -qw msmtp && echo "✓ grupo msmtp cargado" || echo "✗ reabrir sesión o usar sudo"
+```
+
+#### 19.9 Prueba de envío directo
+
+Probar primero msmtp sin intermediarios y después a través de `mail`. Si el primero funciona y el segundo no, el problema está en 19.7.
+
+```bash
+printf 'To: %s\nSubject: Prueba sendmail directo\n\nCuerpo de prueba.\n' "${MIDESTINO:?}" | /usr/sbin/sendmail -t; echo "exit=$?"
+echo "Prueba desde $(hostname) a $(date)." | mail -s "Prueba de msmtp desde $(hostname)" "${MIDESTINO}"
+sudo journalctl -t msmtp -n 2
+```
+
+Cada envío debe dejar una línea con `smtpstatus=250`, `recipients=` igual a la dirección de destino y `from=` igual al `from` de `/etc/msmtprc`. Si msmtp no llega a registrar nada, falló antes de conectar: el error aparece en la terminal.
+
+| Mensaje | Causa probable | Solución |
+|---|---|---|
+| `argumento inválido 587_SMTP para la orden port` | Sustitución incompleta de la plantilla | Revisar el `sed` de 19.4 y ejecutar su verificación |
+| `no se encontraron destinatarios` (solo con `mail`) | `set sendmail` con ruta en vez de URL | Corregir `/etc/mail.rc` según 19.7; `mail -n` (sin `mail.rc`) lo confirma |
+| `/etc/msmtp/aliases: Permiso denegado`, exit 78 | AppArmor bloquea la lectura de los aliases | Override de 19.6 |
+| `authentication failed` | Usuario o contraseña incorrectos | Revisar `/etc/msmtp/password` y `user`; en Gmail, usar app password |
+| `basic authentication is disabled` | El relay exige OAuth2 (Microsoft 365, Outlook) | Cambiar de relay o implementar XOAUTH2 |
+| `connection refused` | Host, puerto o firewall | Revisar `host` y `port`; `nc -vz <host> <puerto>` |
+| `sender address not allowed` | `from` no autorizado en el relay | Usar una dirección autorizada; confirmar `allow_from_override off` y, si aplica, `set_from_header on` |
+| `TLS handshake failed` | Certificado del relay no confiable | Revisar `tls_trust_file` |
+| `not a valid RFC 5321 address` | Destinatario local sin traducir | Revisar `/etc/msmtp/aliases` y la directiva `aliases` |
+| `cannot log to /var/log/msmtp.log` | `logfile` activado sin permisos | Comentar `logfile`; la plantilla ya viene así |
+
+#### 19.10 Prueba de redirección de aliases
+
+```bash
+echo "Prueba de redirección de root a $(date)" | mail -s "Test redirección root" root
+sudo journalctl -t msmtp -n 1
+```
+
+La línea debe mostrar `recipients=` con la dirección de `MIDESTINO`, no `recipients=root`. Si el envío falla con `Permiso denegado`, falta el override de AppArmor de 19.6.
+
+#### 19.11 Prueba con el flujo completo del sistema
+
+Requiere el script de la sección 17.2. Se fuerza una alerta bajando temporalmente el umbral de disco:
+
+```bash
+df -h /
+sudo sed -i 's/-ge 85/-ge 1/' /etc/cron.hourly/server-check
+sudo /etc/cron.hourly/server-check
+```
+
+La alerta debe llegar al correo externo en pocos segundos. Restaurar:
+
+```bash
+sudo sed -i 's/-ge 1/-ge 85/' /etc/cron.hourly/server-check
+sudo /etc/cron.hourly/server-check; echo "exit=$?"
+```
+
+La segunda ejecución debe terminar sin salida y con `exit=0`.
+
+#### 19.12 Consideraciones de seguridad
+
+- `/etc/msmtp/password` es la pieza más sensible: usar una credencial dedicada al servidor y rotarla al reinstalar o ante sospecha de exposición.
+- Los correos pueden incluir información sensible (paquetes con CVE pendientes, archivos modificados, IPs baneadas); el destino debe ser una dirección controlada.
+- UFW no necesita reglas, porque la política saliente es `allow outgoing` (sección 9). Si se restringe el tráfico saliente, abrir 587 o 465 hacia el relay.
+- Si el relay admite OAuth2 o certificado de cliente, son preferibles a usuario y contraseña.
+
+#### 19.13 Logs
+
+```bash
+sudo journalctl -t msmtp -n 50              # últimos envíos
+sudo journalctl -t msmtp -p err             # solo errores
+sudo journalctl -t msmtp --since "1 hour ago"
+```
+
+La retención la gobierna journald (sección 16.1). Si se necesita un log dedicado para depuración puntual:
+
+```bash
+sudoedit /etc/msmtprc                       # descomentar: logfile /var/log/msmtp.log
+sudo install -o root -g msmtp -m 0660 /dev/null /var/log/msmtp.log
+
+sudo tee /etc/logrotate.d/msmtp > /dev/null <<'EOF'
+/var/log/msmtp.log {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0660 root msmtp
+}
+EOF
+```
+
+> Aun con permisos correctos, msmtp puede advertir `cannot log to /var/log/msmtp.log` cuando lo invoca un usuario no-root. El correo se entrega igual; si molesta, volver a comentar `logfile`.
+
+### 20. Documentación operativa
 
 Las secciones anteriores configuraron el servidor; esta deja por escrito qué se configuró, por qué, y cómo operarlo. Sin documentación, un servidor administrable se convierte en un servidor "que solo entiende quien lo desplegó" — y el día que esa persona no esté disponible (vacaciones, cambio de rol, accidente), la organización se queda sin capacidad real de operación.
 
@@ -3814,7 +4461,7 @@ Tres principios atraviesan esta sección:
 
 3. La documentación se actualiza con el sistema. Si hoy se cambia una IP, mañana se añade un servicio o el mes siguiente se modifica una regla de firewall, esos cambios deben reflejarse en la documentación en el mismo momento. Documentación desactualizada es peor que no tener documentación, porque se confía en ella.
 
-#### 19.1 Inventario del servidor
+#### 20.1 Inventario del servidor
 
 El inventario es la "ficha técnica" del servidor: qué es, qué tiene, dónde está. Sirve para que cualquier administrador autorizado pueda situarse rápidamente sin tener que descubrir todo desde cero.
 
@@ -3828,7 +4475,7 @@ El inventario mínimo para un servidor base incluye:
 | Ubicación física / proveedor | "VM local en estación de trabajo del admin" / "VPS en Hetzner FSN1" | conocida por el operador                   |
 | Sistema operativo            | "Debian 13.7 Trixie"                                                | `cat /etc/os-release`                      |
 | IP de gestión                | `192.168.1.10/24`                                                   | `ip -brief address`                        |
-| Puerto SSH                   | `17177`                                                             | `/etc/ssh/sshd_config.d/99-hardening.conf` |
+| Puerto SSH                   | `17177`                                                             | `/etc/ssh/sshd_config.d/01-hardening.conf` |
 | Usuario administrativo       | `usuario`                                                           | manual                                     |
 | Fecha de despliegue          | `2026-05-27`                                                        | conocida por el operador                   |
 | Versión del manual seguido   | `v0.2`                                                              | encabezado del manual                      |
@@ -3839,14 +4486,14 @@ Comandos útiles para extraer el inventario actualizado del servidor:
 hostnamectl
 cat /etc/os-release | grep -E '^(NAME|VERSION)='
 ip -brief address
-sudo grep -E '^(Port|AllowUsers)' /etc/ssh/sshd_config.d/99-hardening.conf
+sudo grep -E '^(Port|AllowUsers)' /etc/ssh/sshd_config.d/01-hardening.conf
 sudo apt-mark showmanual | wc -l    # número de paquetes instalados manualmente
 uptime -s                            # fecha del último arranque
 ```
 
 El inventario se mantiene en una nota o documento del repositorio operativo (Wiki, Git interno, gestor de contraseñas con notas largas), no en el propio servidor. La razón es práctica: si el servidor cae, el inventario debe seguir accesible.
 
-#### 19.2 Diagrama lógico
+#### 20.2 Diagrama lógico
 
 Un diagrama lógico responde rápidamente a preguntas como "¿qué puertos están expuestos?", "¿desde dónde se accede?", "¿qué servicios corren?". En un servidor base sin rol específico, el diagrama es muy simple — apenas el servidor mismo, su interfaz de red, y los puertos abiertos. Cuando se añadan roles (web, mail, base de datos), el diagrama se complica y conviene mantenerlo actualizado.
 
@@ -3890,11 +4537,11 @@ Un buen diagrama responde a estas preguntas sin que haya que abrirlo dos veces:
 
 Lo que un diagrama no necesita en este nivel: detalles internos del kernel, listas exhaustivas de paquetes, configuraciones específicas. Eso vive en el manual o en el inventario de paquetes (sección 18.2.1).
 
-#### 19.3 Runbook básico
+#### 20.3 Runbook básico
 
 Un runbook documenta cómo se hacen las operaciones cotidianas del servidor. Para un servidor base, el runbook es corto porque no hay rol que operar; los runbooks largos vienen con los manuales específicos. Aun así, hay tres operaciones que aplican a cualquier servidor y conviene tener documentadas:
 
-##### 19.3.1 Reinicio controlado
+##### 20.3.1 Reinicio controlado
 
 Reiniciar el servidor no es operación rutinaria, pero ocurre. Los pasos para hacerlo de forma ordenada:
 
@@ -3921,7 +4568,7 @@ sudo journalctl -b -p err --no-pager | head -20
 
 Si el servidor usa LUKS con unlock remoto (sección 2.4), recordar que tras el reinicio hay que hacer el unlock desde otra máquina antes de que SSH normal esté disponible.
 
-##### 19.3.2 Restauración tras desastre
+##### 20.3.2 Restauración tras desastre
 
 El procedimiento completo está en la sección 18.6, pero conviene tener el resumen accesible en el runbook para no buscarlo en el manual completo en mitad de un incidente:
 
@@ -3941,7 +4588,7 @@ El procedimiento completo está en la sección 18.6, pero conviene tener el resu
 
 El runbook debe identificar claramente dónde está la passphrase del repositorio Borg y dónde están los datos de acceso al servidor de respaldos remoto. Sin esos dos elementos, la restauración no es posible.
 
-##### 19.3.3 Acceso de emergencia
+##### 20.3.3 Acceso de emergencia
 
 Si SSH falla, fail2ban banea por error la IP del administrador, o un cambio en UFW corta el acceso, conviene tener documentado:
 
@@ -3949,8 +4596,9 @@ Si SSH falla, fail2ban banea por error la IP del administrador, o un cambio en U
 - Cómo reiniciar el servidor en modo single-user o rescue mode si fuera necesario.
 - Las credenciales de root (donde sea que estén guardadas, típicamente en el gestor de contraseñas de la organización; en este manual la cuenta de root está bloqueada al final de la Etapa II, así que el acceso de emergencia es vía sudo desde el usuario administrativo, lo cual cambia el procedimiento).
 - En caso de IP baneada por fail2ban: desde la consola física, ejecutar `sudo fail2ban-client unban <ip>` o `sudo fail2ban-client set sshd unbanip <ip>`.
+- En caso de bloqueo de `pam_faillock` sobre el usuario administrativo (7.3.3): con `silent`, sudo responde igual que ante una contraseña incorrecta. El bloqueo expira solo tras `unlock_time` y el acceso SSH por llave sigue funcionando, pero con root bloqueado (7.6) nadie puede ejecutar `faillock --reset` antes de ese plazo, salvo desde una shell de root que ya estuviera abierta. La consola del hypervisor / VPS tampoco es un atajo, porque el login de consola pasa por el mismo `pam_faillock`. Lo razonable es esperar; el modo rescate solo se justifica si el bloqueo persiste más allá de `unlock_time`.
 
-#### 19.4 Mantenimiento de la documentación
+#### 20.4 Mantenimiento de la documentación
 
 Documentación desactualizada es peor que no tenerla. Hay que cuidar el ciclo de actualización:
 
@@ -3967,11 +4615,14 @@ Al terminar esta parte, el servidor opera de forma sostenible y queda documentad
 - Logs persistentes, acotados en tamaño y retenidos por tres meses.
 - Monitoreo básico que alerta por correo cuando algo va mal.
 - Respaldos diarios cifrados, locales y remotos, con prueba periódica de restauración.
+- Correo del sistema reenviado a una dirección externa que alguien lee.
 - Inventario, diagrama lógico y runbook básico registrados fuera del servidor.
 
 Con esta parte cerrada, el manual base llega a su fin. El servidor está desplegado, endurecido, mantenido y documentado en su capa genérica.
 
 A partir de aquí, cada manual que extiende esta base añade sus propias capas: servicios específicos del rol (mail, web, base de datos, Apache, WordPress), hardening complementario, runbooks operativos del rol, diagramas enriquecidos, y esquemas de respaldo extendidos. Lo que el manual base estableció — usuarios, SSH endurecido, firewall, fail2ban, sysctl, AppArmor, actualizaciones automáticas, sincronización de tiempo, logs, monitoreo básico, respaldos y MTA mínimo — sirve de cimiento para todos esos manuales y no se vuelve a documentar en cada uno: se hereda y se referencia.
+
+Dos partes de este manual no se ejecutan en el despliegue base y se alcanzan desde los manuales de rol, en el momento que cada uno indica. La §9.6 restringe los puertos web al proxy de borde y se aplica cuando el servicio ya responde a través de él. El Anexo C describe el firewall del proveedor de nube, que acompaña a UFW desde antes de instalar nada y se va abriendo a medida que el rol lo pide. Al terminar el despliegue base, lo correcto es que tanto UFW como el firewall del proveedor admitan solo el puerto de SSH.
 
 ---
 
@@ -3985,18 +4636,32 @@ Este anexo concentra en un solo lugar la lista completa de plantillas referencia
 
 #### A.1 Convenciones del sistema de plantillas
 
-Las plantillas están en el repositorio `https://github.com/noggalito/debian/`, bajo el directorio `assets/13/`. El nombre del archivo de plantilla refleja la ruta de destino con guiones en lugar de barras. Por ejemplo, `plantilla-etc-ssh-sshd_config.d-99-hardening.conf.txt` se despliega en `/etc/ssh/sshd_config.d/99-hardening.conf`.
+Las plantillas están en el repositorio `https://github.com/noggalito/debian/`, bajo el directorio `assets/13/`. El nombre del archivo de plantilla refleja la ruta de destino con guiones en lugar de barras. Por ejemplo, `plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt` se despliega en `/etc/ssh/sshd_config.d/01-hardening.conf`.
 
 Las variables dentro de las plantillas usan el prefijo `$` y se sustituyen con `sed` antes de copiar al destino:
 
 ```bash
 # Patrón general
 export MIVARIABLE=valor
-wget "${ASSETS_BASE}/<plantilla>.txt" -O /tmp/<plantilla>.txt
 
+: "${ASSETS_BASE:?}" "${MIVARIABLE:?}" && \
+wget "${ASSETS_BASE}/<plantilla>.txt" -O /tmp/<plantilla>.txt && \
 sed -e "s|\$MIVARIABLE|${MIVARIABLE}|g" /tmp/<plantilla>.txt \
     | sudo tee /<ruta-destino> > /dev/null
+
+# Comprobar que no quedó ningún marcador sin sustituir
+sudo grep -n '\$MI[A-Z_]*' /<ruta-destino> || echo "✓ plantilla aplicada"
 ```
+
+Guarda, descarga y despliegue forman una sola orden encadenada con `&&`, y no líneas sueltas. El motivo son tres comportamientos comprobados de bash y wget, cada uno capaz de dejar un archivo de sistema vacío o a medio sustituir sin ningún error visible:
+
+- En una shell interactiva, un `${VAR:?}` que falla aborta solo la orden en curso. Si la guarda está en una línea aparte, el resto de un bloque pegado se ejecuta igual, con la variable vacía.
+- Si la guarda está dentro del `sed` de una tubería, el `sed` falla pero `sudo tee` se ejecuta de todos modos: deja el archivo de destino con 0 bytes y la orden termina con código 0.
+- `wget -O` crea el archivo de salida aunque la descarga falle (404, sin red, `ASSETS_BASE` mal escrito). Queda un archivo vacío que un `sed` o un `cp` posteriores instalarían sobre el destino.
+
+Con la cadena, cualquier fallo detiene la orden antes de tocar el destino. Las plantillas sin variables usan la misma cadena con `sudo cp` como último eslabón. Las guardas dentro de un heredoc sin comillas (`<<EOF`) sí son seguras por sí solas: si la expansión falla, `tee` no llega a ejecutarse.
+
+La comprobación final busca marcadores con el prefijo `$MI` que hayan quedado sin sustituir, síntoma de una variable nueva en la plantilla que el comando `sed` no contempla.
 
 Todas las plantillas del repositorio se mantienen con saltos de línea LF (Unix) gracias al archivo `.gitattributes` en la raíz del repositorio. Esto evita que un script descargado falle por shebang con CRLF si el repositorio fuera editado desde un sistema Windows.
 
@@ -4026,13 +4691,13 @@ echo "ASSETS_BASE = ${ASSETS_BASE}"
 | Plantilla                                               | Versión | Sección | Ruta destino                               | Variables                                                                              |
 |---------------------------------------------------------|---------|---------|--------------------------------------------|----------------------------------------------------------------------------------------|
 | `plantilla-etc-hosts.txt`                               | v1.1    | 5.2     | `/etc/hosts`                               | `$MIHOST`, `$MIFQDN`                                                                   |
-| `plantilla-etc-ssh-sshd_config.d-99-hardening.conf.txt` | v1.1    | 8.1     | `/etc/ssh/sshd_config.d/99-hardening.conf` | `$MIPUERTO`, `$MIUSUARIO`                                                              |
+| `plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt` | v1.1    | 8.1     | `/etc/ssh/sshd_config.d/01-hardening.conf` | `$MIPUERTO`, `$MIUSUARIO`                                                              |
 | `plantilla-etc-fail2ban-jail.local.txt`                 | v1.0    | 10.2    | `/etc/fail2ban/jail.local`                 | `$MIPUERTO`                                                                            |
 | `plantilla-etc-sysctl.d-99-hardening.conf.txt`          | v1.1    | 11.1    | `/etc/sysctl.d/99-hardening.conf`          | (sin variables)                                                                        |
 | `plantilla-etc-modprobe.d-99-hardening.conf.txt`        | v1.1    | 11.3    | `/etc/modprobe.d/99-hardening.conf`        | (sin variables)                                                                        |
 | `plantilla-etc-audit-rules.d-99-hardening.rules.txt`    | v1.1    | 12.1    | `/etc/audit/rules.d/99-hardening.rules`    | (sin variables)                                                                        |
 | `plantilla-etc-cron.hourly-server-check.txt`            | v1.1    | 17.2    | `/etc/cron.hourly/server-check`            | (sin variables)                                                                        |
-| `plantilla-etc-msmtprc.txt`                             | v1.1    | C.4     | `/etc/msmtprc`                             | `$MIRELAY`, `$MIPUERTO_SMTP`, `$MIUSUARIO_SMTP`, `$MIFROM`                             |
+| `plantilla-etc-msmtprc.txt`                             | v1.1    | 19.4    | `/etc/msmtprc`                             | `$MIRELAY`, `$MIPUERTO_SMTP`, `$MIUSUARIO_SMTP`, `$MIFROM`                             |
 
 
 #### A.3 Resumen de variables del manual
@@ -4046,14 +4711,14 @@ A lo largo del manual se usan variables de entorno para personalizar las plantil
 | `$MIUSUARIO`      | Usuario administrativo                                            | `usuario`                                     |
 | `$MIPUERTO`       | Puerto SSH personalizado (también usado por fail2ban)             | `17177`                                       |
 | `$MIRELAY`        | Hostname del relay SMTP saliente                                  | `smtp.gmail.com`                              |
-| `$MIPUERTO_SMTP`  | Puerto SMTP del relay (Anexo C — distinto de `$MIPUERTO`)         | `587`                                         |
+| `$MIPUERTO_SMTP`  | Puerto SMTP del relay (sección 19 — distinto de `$MIPUERTO`)      | `587`                                         |
 | `$MIUSUARIO_SMTP` | Usuario para autenticarse contra el relay                         | `cuenta@dominio.com`                          |
 | `$MIFROM`         | Dirección "From" autorizada en el relay                           | `cuenta@dominio.com`                          |
 | `$MIDESTINO`      | Dirección externa donde llega el correo del sistema               | `admin@dominio.com`                           |
 | `$SHA_COMMIT`     | SHA del commit del repositorio de plantillas anclado              | `a1b2c3d4...` (40 chars)                      |
 | `$ASSETS_BASE`    | URL base para descarga de plantillas (derivada de `SHA_COMMIT`)   | `https://raw.githubusercontent.com/.../assets`|
 
-Conviene anotar los valores efectivos usados en este servidor concreto en el inventario del repositorio operativo (sección 19.1). Esto facilita reconstruir o auditar el servidor más adelante sin tener que adivinar qué se sustituyó en qué momento.
+Conviene anotar los valores efectivos usados en este servidor concreto en el inventario del repositorio operativo (sección 20.1). Esto facilita reconstruir o auditar el servidor más adelante sin tener que adivinar qué se sustituyó en qué momento.
 
 #### A.4 Modificación local de plantillas
 
@@ -4061,7 +4726,7 @@ Si se necesita un cambio que no admite ninguna de las variables existentes (por 
 
 Hacer un fork del repositorio y mantener una versión propia de la plantilla. Apropiado cuando los cambios son sostenidos en el tiempo y aplican a varios servidores de la organización. La URL de descarga apuntaría al fork en lugar del repositorio original.
 
-Editar el archivo destino tras desplegarlo. Apropiado cuando el cambio es específico de un servidor concreto. Anotar el cambio en el runbook (sección 19.3) para que sobreviva a redespliegues.
+Editar el archivo destino tras desplegarlo. Apropiado cuando el cambio es específico de un servidor concreto. Anotar el cambio en el runbook (sección 20.3) para que sobreviva a redespliegues.
 
 No editar las plantillas en el repositorio original sin coordinación. Hacerlo afecta a todos los manuales y servidores futuros que dependan del mismo archivo.
 
@@ -4069,7 +4734,7 @@ No editar las plantillas en el repositorio original sin coordinación. Hacerlo a
 
 Cuando algo va mal — un servicio que no responde, una alerta que llega, una caída inesperada — el tiempo invertido en diagnosticar correctamente determina si el incidente se resuelve en minutos o en horas. Este anexo concentra los comandos más útiles agrupados por síntoma. No reemplaza un análisis profundo, pero sí permite levantar rápidamente una imagen del estado del sistema y descartar las causas más comunes.
 
-El anexo asume que el operador llegó al servidor por SSH (o consola) y tiene acceso `sudo`. Si SSH falla, el primer recurso es la consola física o del hypervisor / VPS, documentada en el runbook de la sección 19.3.3.
+El anexo asume que el operador llegó al servidor por SSH (o consola) y tiene acceso `sudo`. Si SSH falla, el primer recurso es la consola física o del hypervisor / VPS, documentada en el runbook de la sección 20.3.3.
 
 #### B.1 Imagen general del sistema
 
@@ -4155,7 +4820,7 @@ sudo find /tmp -type f -size +100M -exec ls -lh {} \;
 sudo journalctl --disk-usage
 ```
 
-Causas frecuentes: logs sin rotar (logrotate falló), un proceso que escribe sin parar a un archivo (revisar `/var/log` y `/tmp`), un dump de base de datos olvidado, un respaldo a medio hacer. Si journald está consumiendo demasiado, ajustar `SystemMaxUse` en `/etc/systemd/journald.conf` (sección 16.1.1) y ejecutar `sudo journalctl --vacuum-time=7d` para forzar la limpieza inmediata.
+Causas frecuentes: logs sin rotar (logrotate falló), `/var/log/sudo-io/` sin regla de retención (16.2.1), un proceso que escribe sin parar a un archivo (revisar `/var/log` y `/tmp`), un dump de base de datos olvidado, un respaldo a medio hacer. Si journald está consumiendo demasiado, ajustar `SystemMaxUse` en `/etc/systemd/journald.conf` (sección 16.1.1) y ejecutar `sudo journalctl --vacuum-time=7d` para forzar la limpieza inmediata.
 
 #### B.5 Síntoma: no puedo conectar por SSH
 
@@ -4193,7 +4858,7 @@ sudo journalctl -u ssh -n 50
 sudo journalctl -u ssh --since "30 minutes ago" | grep -iE 'fail|invalid|preauth'
 ```
 
-Causas frecuentes: cambio reciente en `sshd_config.d/99-hardening.conf` que rompe la sintaxis (verificar siempre con `sudo sshd -t` antes de recargar), regla de UFW eliminada por error, IP del administrador baneada por fail2ban tras varios fallos legítimos, puerto cambiado y olvidado actualizar el `~/.ssh/config` del cliente.
+Causas frecuentes: cambio reciente en `sshd_config.d/01-hardening.conf` que rompe la sintaxis (verificar siempre con `sudo sshd -t` antes de recargar), regla de UFW eliminada por error, IP del administrador baneada por fail2ban tras varios fallos legítimos, puerto cambiado y olvidado actualizar el `~/.ssh/config` del cliente.
 
 #### B.6 Síntoma: red sin conectividad
 
@@ -4310,7 +4975,8 @@ Para casos donde se sospecha compromiso, la regla de oro es no apagar el servido
 
 Si tras estas verificaciones no se identifica la causa, o el incidente excede la capacidad del operador único, los pasos típicos son: levantar un ticket en el sistema de la organización, contactar al equipo de seguridad si se sospecha compromiso, y dejar el servidor en un estado controlado (servicios críticos detenidos si causan más daño que beneficio, red aislada si se sospecha compromiso) mientras llega ayuda.
 
-El runbook (sección 19.3) debe documentar a quién escalar y por qué canal, antes de que el incidente ocurra. Un incidente real no es momento de descubrir que nadie tiene el teléfono del responsable de seguridad.
+El runbook (sección 20.3) debe documentar a quién escalar y por qué canal, antes de que el incidente ocurra. Un incidente real no es momento de descubrir que nadie tiene el teléfono del responsable de seguridad.
+
 #### B.11 Síntoma: volumen anómalo de peticiones en un servicio web
 
 Se manifiesta como lentitud intermitente, picos de carga sin causa aparente, o simplemente como un log de acceso que crece más rápido de lo normal. El objetivo de este apartado es responder tres preguntas sobre un log de acceso en formato JSON, que es el que producen la mayoría de proxies inversos modernos: qué proporción del tráfico es real, de dónde viene lo que no lo es, y si hay una ruta concreta bajo presión.
@@ -4373,268 +5039,256 @@ print('IPs distintas/hora  mediana:', statistics.median(len(v) for v in porhora.
 
 > Estos comandos leen la cola del archivo activo. Si el incidente es de días atrás, hay que descomprimir primero los archivos rotados, y conviene revisar la §16.5 antes de dar por hecho que siguen ahí.
 
-### Anexo C — Reenvío de correo del sistema con `msmtp`
+### Anexo C — Firewall del proveedor de nube
 
-`unattended-upgrades` (14.3), `rkhunter`, `debsums`, `aide` (12) y el script de alertas (17.2) envían correo a `root`. Sin configuración adicional, esos mensajes quedan en `/var/mail/root`, donde casi nadie los lee. Este anexo reenvía el correo de cualquier usuario local a una dirección externa mediante un relay SMTP autenticado. El servidor solo envía; no recibe. Se usa `msmtp` porque es solo un transmisor: sin demonio en escucha ni cola propia.
+En un servidor en la nube hay dos firewalls en serie. El del proveedor actúa en su red, antes de que el paquete llegue a la máquina; UFW actúa dentro de ella. La sección 9 configura el segundo. Este anexo se ocupa del primero, que el manual base no puede configurar por el lector porque depende del proveedor, pero que condiciona todo lo demás: un puerto abierto en UFW y cerrado en el proveedor no recibe nada, y uno cerrado en UFW y abierto en el proveedor puede seguir expuesto si lo publica un contenedor.
 
-#### C.1 Decisiones de diseño
+Aplica a cualquier servidor con un firewall gestionado delante: los grupos de seguridad de red de Azure, los grupos de seguridad de AWS, los firewalls de nube de Hetzner o DigitalOcean, el firewall de VPS de Hostinger, las listas de seguridad de Oracle. En un servidor físico o en una VM sin esa capa no hay nada que configurar aquí, y C.1 explica qué se pierde.
 
-- Aliases en `/etc/msmtp/aliases`, no en `/etc/aliases`: msmtp no lee el archivo tradicional, y sin traducción el relay rechaza destinatarios como `root`.
-- Logs en journald (sección 16.1), no en archivo dedicado: evita problemas de permisos con usuarios no-root y no requiere logrotate.
-- Gmail con app password como ejemplo concreto (C.4.1). Outlook/Hotmail personales quedan fuera porque exigen XOAUTH2.
+#### C.1 Dos firewalls, dos alcances
 
-#### C.2 Requisitos previos
+Los dos se mantienen, y con las mismas reglas. No es redundancia gratuita: cada uno cubre un fallo del otro.
 
-- Relay SMTP con autenticación estándar (corporativo, Mailgun, Brevo, Amazon SES, Gmail).
-- Usuario y contraseña del relay.
-- Dirección `From` autorizada en el relay.
-- Dirección de destino para el correo del sistema.
+El firewall del proveedor filtra antes de que el tráfico consuma nada del servidor, sobrevive a un error de configuración dentro de la máquina y es el único de los dos que alcanza a los puertos publicados por contenedores. El demonio de contenedores inserta sus reglas en cadenas que UFW no gobierna, de modo que una regla de UFW sobre un puerto publicado por un contenedor ni lo abre ni lo cierra.
 
-#### C.3 Instalación
+UFW protege frente a lo que el proveedor no ve: las otras máquinas de la misma red virtual, que el proveedor suele permitir entre sí por defecto, y un grupo de seguridad que alguien deje abierto por error desde el panel. Además vive en el servidor, se respalda con `/etc` y se audita con las mismas herramientas que el resto del manual.
 
-```bash
-sudo apt install -y msmtp msmtp-mta mailutils
-```
+> En un servidor sin firewall de proveedor, los puertos publicados por contenedores quedan expuestos a todo lo que alcance la máquina, diga lo que diga UFW. La salida es filtrar en la cadena que el propio demonio consulta antes que las suyas, y no está documentada en este manual porque no se ha verificado en los entornos del corpus. Queda anotada en el To-do. Mientras tanto, la regla práctica es no publicar puertos de contenedores en un servidor que no tenga esa capa delante.
 
-`msmtp-mta` convierte `/usr/sbin/sendmail` en un enlace a msmtp, de modo que cron y cualquier programa que use `sendmail` envían por msmtp. `mailutils` aporta el comando `mail`.
+#### C.2 Reglas según el momento del despliegue
 
-##### C.3.1 Retiro de `exim4` y `bsd-mailx`
+El firewall del proveedor deniega por defecto todo lo entrante, igual que UFW, y se abre en el mismo orden y con el mismo criterio. Lo que cambia a lo largo del despliegue es poco:
 
-La sección 12.2 instala `rkhunter`, cuyas Recommends traen `exim4` (como `default-mta`) y `bsd-mailx`. Al instalar `msmtp-mta`, apt retira los tres paquetes de `exim4`, pero los deja en estado `rc` con su configuración en `/etc/exim4/`. `bsd-mailx`, por su parte, tiene prioridad 50 frente a 30 de `mailutils` en la alternativa `mailx`, así que `/usr/bin/mail` seguiría apuntando a él. Como `mailutils` ya satisface la recomendación de `rkhunter`, se retiran ambos:
-
-```bash
-sudo apt purge exim4-base exim4-config exim4-daemon-light bsd-mailx
-sudo apt autoremove --purge
-```
-
-> `autoremove` ejecutado antes de instalar `msmtp-mta` no retira nada: mientras `exim4` sea el único MTA, apt lo considera necesario. El buzón `/var/mail/root` se conserva; conviene revisarlo una vez con `sudo less /var/mail/root`.
-
-Verificar:
-
-```bash
-dpkg -l 'exim4*' | grep -E '^(ii|rc)' || echo "exim4 eliminado por completo"
-readlink -f /usr/sbin/sendmail
-readlink -f /usr/bin/mail
-sudo ss -tlnp | grep ':25\b' || echo "nada escucha en el puerto 25"
-```
-
-Salida esperada:
-
-```
-exim4 eliminado por completo
-/usr/bin/msmtp
-/usr/bin/mail.mailutils
-nada escucha en el puerto 25
-```
-
-#### C.4 Configuración global de msmtp
-
-La variable del puerto se llama `MIPUERTO_SMTP` para no pisar `MIPUERTO`, que es el puerto SSH (sección 8). `ASSETS_BASE` se define en la Parte I.
-
-```bash
-export MIRELAY=smtp.relay.example.com
-export MIPUERTO_SMTP=587
-export MIUSUARIO_SMTP=notificaciones@example.com
-export MIFROM=notificaciones@example.com
-
-wget "${ASSETS_BASE:?}/plantilla-etc-msmtprc.txt" -O /tmp/plantilla-etc-msmtprc.txt
-
-sed -e "s|\$MIRELAY|${MIRELAY:?}|g" \
-    -e "s|\$MIPUERTO_SMTP|${MIPUERTO_SMTP:?}|g" \
-    -e "s|\$MIUSUARIO_SMTP|${MIUSUARIO_SMTP:?}|g" \
-    -e "s|\$MIFROM|${MIFROM:?}|g" \
-    /tmp/plantilla-etc-msmtprc.txt \
-    | sudo tee /etc/msmtprc > /dev/null
-
-sudo chmod 0640 /etc/msmtprc
-sudo chown root:msmtp /etc/msmtprc
-```
-
-Comprobar que no quedaron variables sin sustituir (un nombre que es prefijo de otro, como `MIPUERTO` de `MIPUERTO_SMTP`, deja restos como `587_SMTP`):
-
-```bash
-sudo grep -vE '^[[:space:]]*#' /etc/msmtprc | grep -nE '\$|MI[A-Z_]+' && echo "✗ quedan variables sin sustituir" || echo "✓ plantilla sustituida"
-```
-
-Fijar el remitente. mailutils pasa a sendmail su propio remitente (`-f usuario@FQDN`), que un relay estricto rechaza; `allow_from_override off` obliga a msmtp a usar siempre el `from` configurado. La plantilla v1.2 ya lo incluye; con versiones anteriores se añade así (el comando es idempotente):
-
-```bash
-sudo grep -q '^allow_from_override' /etc/msmtprc || sudo sed -i '/^aliases/a allow_from_override off' /etc/msmtprc
-```
-
-> `allow_from_override` fija el remitente del envelope. Si el relay valida también la cabecera `From:` (Amazon SES y algunos corporativos lo hacen; Gmail la reescribe por su cuenta), añadir además `set_from_header on` en el bloque `defaults`.
-
-##### C.4.1 Caso particular: Gmail con app password
-
-```bash
-export MIRELAY=smtp.gmail.com
-export MIPUERTO_SMTP=587
-export MIUSUARIO_SMTP=tu-cuenta@gmail.com
-export MIFROM=tu-cuenta@gmail.com
-```
-
-1. Activar la verificación en dos pasos en <https://myaccount.google.com/security>.
-2. Generar una app password en <https://myaccount.google.com/apppasswords> con un nombre descriptivo (ej. `msmtp-mandarina`). Se muestra una sola vez: guardarla en el gestor de contraseñas.
-3. Usar esa clave de 16 caracteres en C.5.
-
-Gmail limita las cuentas gratuitas a 500 destinatarios diarios, irrelevante para alertas. La app password da acceso completo a la cuenta; es preferible una cuenta dedicada solo a notificaciones.
-
-#### C.5 Contraseña del relay
-
-```bash
-sudo install -d -o root -g msmtp -m 0750 /etc/msmtp
-printf '%s' 'la-contraseña-o-app-password' | sudo tee /etc/msmtp/password > /dev/null
-sudo chmod 0640 /etc/msmtp/password
-sudo chown root:msmtp /etc/msmtp/password
-sudo ls -la /etc/msmtp/
-```
-
-`printf '%s'` evita el salto de línea final que añadiría `echo`. Salida esperada:
-
-```
-drwxr-x--- 2 root msmtp 4096 ... .
--rw-r----- 1 root msmtp   XX ... password
-```
-
-#### C.6 Aliases para destinatarios locales
-
-```bash
-export MIDESTINO=admin@example.com
-
-sudo tee /etc/msmtp/aliases > /dev/null <<EOF
-# Aliases de msmtp: <local>: <externa>
-root: ${MIDESTINO:?}
-default: ${MIDESTINO}
-EOF
-
-sudo chmod 0644 /etc/msmtp/aliases
-sudo chown root:root /etc/msmtp/aliases
-sudo grep '^aliases' /etc/msmtprc
-```
-
-`default:` captura cualquier otro usuario local (`postmaster`, `daemon`, cuentas de servicio). El `grep` debe devolver `aliases         /etc/msmtp/aliases`; si no aparece:
-
-```bash
-sudo sed -i '/^timeout/a aliases         /etc/msmtp/aliases' /etc/msmtprc
-```
-
-El perfil de AppArmor que msmtp trae en Debian 13 está en modo enforce y no permite leer `/etc/msmtp/aliases`. Sin este override, todo envío a un destinatario local falla con `Permiso denegado` y exit 78. La denegación no aparece ni en `journalctl -k` ni en `ausearch`.
-
-```bash
-echo '/etc/msmtp/aliases r,' | sudo tee -a /etc/apparmor.d/local/usr.bin.msmtp > /dev/null
-sudo apparmor_parser -r /etc/apparmor.d/usr.bin.msmtp
-```
-
-#### C.7 Configuración de mailutils
-
-```bash
-sudo tee /etc/mail.rc > /dev/null <<'EOF'
-set sendmail="sendmail:///usr/sbin/sendmail"
-set sendwait
-EOF
-```
-
-En mailutils, `sendmail` es una URL de mailer, no una ruta. Con la ruta a secas (`/usr/sbin/sendmail`), mailutils ejecuta el programa sin pasarle destinatarios y msmtp responde `no se encontraron destinatarios`. `sendwait` hace que `mail` espere el resultado y muestre los errores.
-
-#### C.8 Grupo `msmtp` para el usuario administrativo
-
-Permite enviar correo de prueba sin `sudo`. Los servicios del sistema corren como root y no lo necesitan.
-
-```bash
-sudo usermod -aG msmtp "${MIUSUARIO:?}"
-exit
-# Reconectar por SSH
-id -nG | grep -qw msmtp && echo "✓ grupo msmtp cargado" || echo "✗ reabrir sesión o usar sudo"
-```
-
-#### C.9 Prueba de envío directo
-
-Probar primero msmtp sin intermediarios y después a través de `mail`. Si el primero funciona y el segundo no, el problema está en C.7.
-
-```bash
-printf 'To: %s\nSubject: Prueba sendmail directo\n\nCuerpo de prueba.\n' "${MIDESTINO:?}" | /usr/sbin/sendmail -t; echo "exit=$?"
-echo "Prueba desde $(hostname) a $(date)." | mail -s "Prueba de msmtp desde $(hostname)" "${MIDESTINO}"
-sudo journalctl -t msmtp -n 2
-```
-
-Cada envío debe dejar una línea con `smtpstatus=250`, `recipients=` igual a la dirección de destino y `from=` igual al `from` de `/etc/msmtprc`. Si msmtp no llega a registrar nada, falló antes de conectar: el error aparece en la terminal.
-
-| Mensaje | Causa probable | Solución |
+| Momento | Reglas de entrada | Dónde se decide |
 |---|---|---|
-| `argumento inválido 587_SMTP para la orden port` | Sustitución incompleta de la plantilla | Revisar el `sed` de C.4 y ejecutar su verificación |
-| `no se encontraron destinatarios` (solo con `mail`) | `set sendmail` con ruta en vez de URL | Corregir `/etc/mail.rc` según C.7; `mail -n` (sin `mail.rc`) lo confirma |
-| `/etc/msmtp/aliases: Permiso denegado`, exit 78 | AppArmor bloquea la lectura de los aliases | Override de C.6 |
-| `authentication failed` | Usuario o contraseña incorrectos | Revisar `/etc/msmtp/password` y `user`; en Gmail, usar app password |
-| `basic authentication is disabled` | El relay exige OAuth2 (Microsoft 365, Outlook) | Cambiar de relay o implementar XOAUTH2 |
-| `connection refused` | Host, puerto o firewall | Revisar `host` y `port`; `nc -vz <host> <puerto>` |
-| `sender address not allowed` | `from` no autorizado en el relay | Usar una dirección autorizada; confirmar `allow_from_override off` y, si aplica, `set_from_header on` |
-| `TLS handshake failed` | Certificado del relay no confiable | Revisar `tls_trust_file` |
-| `not a valid RFC 5321 address` | Destinatario local sin traducir | Revisar `/etc/msmtp/aliases` y la directiva `aliases` |
-| `cannot log to /var/log/msmtp.log` | `logfile` activado sin permisos | Comentar `logfile`; la plantilla ya viene así |
+| Despliegue base, este manual | Solo SSH en el puerto de la sección 8 | Sección 9.3 |
+| Servicio web publicado directamente | SSH, más 80 y 443 desde cualquier origen | Manual del proxy inverso |
+| Servicio web detrás de un borde | SSH, más 443 solo desde los rangos del borde | Sección 9.6 |
 
-#### C.10 Prueba de redirección de aliases
+Tres criterios valen para cualquier proveedor.
+
+Se parte de lo que ya exista y se borra lo que sobre. Las máquinas creadas desde un asistente suelen traer una regla que abre el puerto 22 a cualquier origen. Con SSH movido de puerto según la sección 8, esa regla no protege nada y deja declarado un puerto en el que no escucha nadie; se sustituye por la del puerto real.
+
+Las reglas temporales se anotan en el momento de crearlas. Un puerto de aplicación abierto un momento para una prueba es el origen más habitual de una exposición que nadie recuerda. Si hace falta, se limita a la dirección del administrador y se borra en la misma sesión.
+
+El puerto de SSH se restringe a la dirección del administrador solo si esa dirección es estable. Con una dirección que cambia, la restricción acaba cortando el acceso en el peor momento, y la protección real de SSH ya la dan la autenticación por llave de la sección 8 y fail2ban de la sección 10.
+
+#### C.3 Azure: grupo de seguridad de red
+
+En Azure el firewall del proveedor es el grupo de seguridad de red, NSG por sus siglas en inglés. Puede haber uno asociado a la interfaz de la máquina y otro a la subred, y el tráfico tiene que pasar los dos. Las reglas se evalúan por prioridad, de menor a mayor número, y la lista termina con una regla implícita que deniega todo lo entrante que no venga de la propia red virtual o del balanceador de Azure.
+
+Las órdenes se ejecutan desde la estación de trabajo y no desde el servidor. Una sesión de `az` iniciada en la máquina es una credencial con poder sobre toda la suscripción, al alcance de quien la comprometa.
 
 ```bash
-echo "Prueba de redirección de root a $(date)" | mail -s "Test redirección root" root
-sudo journalctl -t msmtp -n 1
+az login
+export RG=<grupo-de-recursos>
+az network nsg list -g "${RG:?}" -o table
+
+export NSG=<nombre-del-nsg>
+az network nsg rule list -g "${RG:?}" --nsg-name "${NSG:?}" -o table
 ```
 
-La línea debe mostrar `recipients=` con la dirección de `MIDESTINO`, no `recipients=root`. Si el envío falla con `Permiso denegado`, falta el override de AppArmor de C.6.
+La última orden muestra las reglas propias. Con `--include-default` añade las implícitas, que conviene ver una vez para saber qué se permite sin haberlo pedido.
 
-#### C.11 Prueba con el flujo completo del sistema
-
-Requiere el script de la sección 17.2. Se fuerza una alerta bajando temporalmente el umbral de disco:
+**SSH.** Con la dirección del administrador fija:
 
 ```bash
-df -h /
-sudo sed -i 's/-ge 85/-ge 1/' /etc/cron.hourly/server-check
-sudo /etc/cron.hourly/server-check
+export MIPUERTO=17177                           # definido en 8.1
+export MI_IP=$(curl -s https://api.ipify.org)
+
+az network nsg rule create -g "${RG:?}" --nsg-name "${NSG:?}" -n SSH-admin \
+  --priority 100 --direction Inbound --access Allow --protocol Tcp \
+  --source-address-prefixes "${MI_IP:?}" --destination-port-ranges "${MIPUERTO:?}"
 ```
 
-La alerta debe llegar al correo externo en pocos segundos. Restaurar:
+Con una dirección que cambia, se omite `--source-address-prefixes` y la regla admite cualquier origen, según el tercer criterio de C.2.
+
+**Servicio web publicado directamente.**
 
 ```bash
-sudo sed -i 's/-ge 1/-ge 85/' /etc/cron.hourly/server-check
-sudo /etc/cron.hourly/server-check; echo "exit=$?"
+az network nsg rule create -g "${RG:?}" --nsg-name "${NSG:?}" -n Web-publico \
+  --priority 200 --direction Inbound --access Allow --protocol Tcp \
+  --destination-port-ranges 80 443
 ```
 
-La segunda ejecución debe terminar sin salida y con `exit=0`.
-
-#### C.12 Consideraciones de seguridad
-
-- `/etc/msmtp/password` es la pieza más sensible: usar una credencial dedicada al servidor y rotarla al reinstalar o ante sospecha de exposición.
-- Los correos pueden incluir información sensible (paquetes con CVE pendientes, archivos modificados, IPs baneadas); el destino debe ser una dirección controlada.
-- UFW no necesita reglas, porque la política saliente es `allow outgoing` (sección 9). Si se restringe el tráfico saliente, abrir 587 o 465 hacia el relay.
-- Si el relay admite OAuth2 o certificado de cliente, son preferibles a usuario y contraseña.
-
-#### C.13 Logs
+**Servicio web detrás de un borde.** Las listas se descargan en la estación, con la misma comprobación de 9.6 antes de usarlas, y van en dos reglas, una por familia de direcciones:
 
 ```bash
-sudo journalctl -t msmtp -n 50              # últimos envíos
-sudo journalctl -t msmtp -p err             # solo errores
-sudo journalctl -t msmtp --since "1 hour ago"
+rm -f /tmp/rangos-v4.txt /tmp/rangos-v6.txt
+curl -fsS "https://<proveedor>/ips-v4" -o /tmp/rangos-v4.txt
+curl -fsS "https://<proveedor>/ips-v6" -o /tmp/rangos-v6.txt
+cat /tmp/rangos-v4.txt; echo; cat /tmp/rangos-v6.txt; echo
+
+az network nsg rule create -g "${RG:?}" --nsg-name "${NSG:?}" -n Web-borde-v4 \
+  --priority 200 --direction Inbound --access Allow --protocol Tcp \
+  --source-address-prefixes $(cat /tmp/rangos-v4.txt) --destination-port-ranges 443
+
+az network nsg rule create -g "${RG:?}" --nsg-name "${NSG:?}" -n Web-borde-v6 \
+  --priority 210 --direction Inbound --access Allow --protocol Tcp \
+  --source-address-prefixes $(cat /tmp/rangos-v6.txt) --destination-port-ranges 443
 ```
 
-La retención la gobierna journald (sección 16.1). Si se necesita un log dedicado para depuración puntual:
+Si una descarga falla, el archivo queda vacío, la orden se queda sin valores para `--source-address-prefixes` y `az` la rechaza sin crear nada. La regla de IPv6 solo surte efecto si la máquina tiene una dirección IPv6 pública; crearla sin tenerla no hace daño y evita olvidarla el día que se asigne. Si el borde también llega al origen por HTTP, el puerto 80 se añade a `--destination-port-ranges`, con el mismo criterio que `PUERTOS_BORDE` en 9.6.
+
+**Retiro de lo que sobra.** Primero se crean las reglas restringidas y después se borran las abiertas, igual que en 9.6. Los candidatos habituales son la regla del puerto 22 que dejó el asistente, una regla de 80 y 443 desde cualquier origen cuando ya hay un borde, y cualquier puerto de aplicación abierto para una prueba.
 
 ```bash
-sudoedit /etc/msmtprc                       # descomentar: logfile /var/log/msmtp.log
-sudo install -o root -g msmtp -m 0660 /dev/null /var/log/msmtp.log
+az network nsg rule list -g "${RG:?}" --nsg-name "${NSG:?}" -o table
+az network nsg rule delete -g "${RG:?}" --nsg-name "${NSG:?}" -n <nombre-de-la-regla>
+```
 
-sudo tee /etc/logrotate.d/msmtp > /dev/null <<'EOF'
-/var/log/msmtp.log {
-    weekly
-    rotate 8
-    compress
-    delaycompress
-    missingok
-    notifempty
-    create 0660 root msmtp
+**Los dos niveles.** Si después de todo lo anterior un puerto sigue sin responder, o sigue respondiendo, lo que se está viendo es el efecto combinado del NSG de la interfaz y el de la subred:
+
+```bash
+az network nic list -g "${RG:?}" -o table
+az network nic list-effective-nsg -g "${RG:?}" -n <nombre-de-la-interfaz>
+```
+
+Desde el portal, las mismas reglas están en la máquina virtual, en el apartado de redes, como reglas de puerto de entrada. Los paneles cambian de sitio y de nombre; el concepto es el de este anexo.
+
+> Estas órdenes están tomadas de la referencia de la CLI de Azure y no de una corrida completa en los entornos del corpus. Está anotado en el To-do. Antes de borrar ninguna regla, comprueba con C.5 que las nuevas hacen lo que se espera.
+
+#### C.4 Hostinger: firewall del VPS
+
+En Hostinger el firewall del proveedor es un grupo de reglas que se crea en el panel y se activa sobre el VPS. Una máquina solo puede tener un grupo activo. El grupo descarta todo lo entrante que no tenga una regla que lo acepte, y alcanza a los puertos publicados por contenedores: con él activo dejan de responder desde fuera, que es lo que C.5 comprueba.
+
+Dos particularidades condicionan el procedimiento. Las reglas no admiten una lista de orígenes, de modo que restringir un puerto a los rangos de un borde son tantas reglas como rangos. Y un cambio en las reglas no llega a la máquina hasta que el grupo se sincroniza: mientras tanto el listado muestra la regla nueva y el VPS sigue filtrando con las anteriores.
+
+El grupo y la regla de SSH se crean desde el panel en el despliegue base, en el apartado de seguridad del VPS. La regla de SSH se añade antes de activar el grupo sobre la máquina, porque un grupo activo sin esa regla corta también el acceso de administración.
+
+Para las reglas del borde se usa la API, que evita crear una regla por rango a mano. Las órdenes se ejecutan desde la estación de trabajo y no desde el servidor, por la misma razón que en C.3: el token es una credencial de la cuenta del proveedor. Se genera en el apartado de API del panel, con la caducidad más corta que ofrezca, y se revoca al terminar.
+
+```bash
+read -rsp "Token de la API de Hostinger: " HAPI; echo
+export API=https://developers.hostinger.com/api/vps/v1
+hapi() { printf 'Authorization: Bearer %s\n' "${HAPI:?}" | curl -sS -H @- -H 'Content-Type: application/json' "$@"; }
+```
+
+El token se lee sin eco y llega a `curl` por la entrada estándar, de modo que no queda en el historial de la shell ni en la lista de procesos.
+
+```bash
+hapi "${API:?}/firewall" | python3 -m json.tool
+
+export FW=<id-del-grupo>
+hapi "${API:?}/firewall/${FW:?}" | python3 -m json.tool
+```
+
+La primera orden lista los grupos de la cuenta con su `id`. La segunda muestra las reglas del elegido, y entre ellas tiene que estar la de SSH:
+
+```
+{
+    "id": 1391065,
+    "action": "accept",
+    "protocol": "TCP",
+    "port": "17177",
+    "source": "any",
+    "source_detail": "any"
 }
-EOF
 ```
 
-> Aun con permisos correctos, msmtp puede advertir `cannot log to /var/log/msmtp.log` cuando lo invoca un usuario no-root. El correo se entrega igual; si molesta, volver a comentar `logfile`.
+Si la lista de grupos sale vacía o la regla de SSH no aparece, no se continúa. Lo que filtra delante de la máquina no es lo que se cree, y conviene averiguarlo antes de tocar nada.
+
+Servicio web detrás de un borde. Las listas se descargan en la estación, con la misma comprobación de 9.6 antes de usarlas, y se crea una regla por rango:
+
+```bash
+rm -f /tmp/rangos-v4.txt /tmp/rangos-v6.txt
+curl -fsS "https://<proveedor>/ips-v4" -o /tmp/rangos-v4.txt
+curl -fsS "https://<proveedor>/ips-v6" -o /tmp/rangos-v6.txt
+{ cat /tmp/rangos-v4.txt; echo; cat /tmp/rangos-v6.txt; echo; } | grep -v '^$' > /tmp/rangos-borde.txt
+wc -l < /tmp/rangos-borde.txt
+
+for R in $(cat /tmp/rangos-borde.txt); do
+  printf '%-22s ' "${R}"
+  hapi -o /dev/null -w '%{http_code}\n' -X POST "${API:?}/firewall/${FW:?}/rules" \
+    -d "{\"protocol\":\"TCP\",\"port\":\"443\",\"source\":\"custom\",\"source_detail\":\"${R}\"}"
+  sleep 1
+done
+```
+
+El recuento de `wc` debe coincidir con el número de rangos aplicado en UFW, que en el servidor es el número de líneas de `${RANGOS_ARCHIVO}`. Cada línea del bucle debe terminar en `200`, tanto para los rangos IPv4 como para los IPv6. Si la descarga falló, el archivo queda vacío y el bucle no crea nada. Si el borde también llega al origen por HTTP, el bucle se repite con el puerto 80, con el mismo criterio que `PUERTOS_BORDE` en 9.6.
+
+Las reglas creadas todavía no filtran. Se sincroniza el grupo y se comprueba el resultado:
+
+```bash
+hapi -X POST "${API:?}/firewall/${FW:?}/sync" | python3 -m json.tool
+
+hapi "${API:?}/firewall/${FW:?}" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+print('sincronizado:', d.get('is_synced'))
+for r in d.get('rules', []):
+    print(r['id'], r['action'], r['protocol'], r['port'], r['source_detail'])"
+
+unset HAPI
+```
+
+La sincronización responde `Request accepted` y se aplica en segundo plano. El listado debe mostrar `sincronizado: True`, la regla de SSH y una regla del 443 por rango; si todavía dice `False`, se repite al cabo de unos segundos. Después se revoca el token en el panel, porque el `unset` solo lo borra de la terminal, y se comprueba que el acceso por SSH sigue funcionando.
+
+SSH y servicio web publicado directamente. Se crean con la misma orden, cambiando el puerto y con el origen abierto, que en la API se escribe como aparece en el listado la regla de SSH creada desde el panel:
+
+```bash
+export MIPUERTO=17177                           # definido en 8.1
+
+hapi -o /dev/null -w '%{http_code}\n' -X POST "${API:?}/firewall/${FW:?}/rules" \
+  -d "{\"protocol\":\"TCP\",\"port\":\"${MIPUERTO:?}\",\"source\":\"any\",\"source_detail\":\"any\"}"
+```
+
+Retiro de lo que sobra. Primero se crean y se sincronizan las reglas restringidas y después se borran las abiertas, igual que en 9.6. Cada regla se borra por el identificador que muestra el listado, y el borrado tampoco surte efecto hasta sincronizar:
+
+```bash
+hapi -o /dev/null -w '%{http_code}\n' -X DELETE "${API:?}/firewall/${FW:?}/rules/<id-de-la-regla>"
+hapi -X POST "${API:?}/firewall/${FW:?}/sync" | python3 -m json.tool
+```
+
+> La API tiene además una operación que sustituye todas las reglas del grupo de una vez, con `PUT` sobre la misma ruta de las reglas. Sustituye el conjunto entero: si la lista enviada no incluye la regla de SSH, el acceso de administración se pierde en la siguiente sincronización. No se usa en este manual.
+
+> De esta subsección están verificados en un entorno del corpus el listado, el alta de reglas por rango y la sincronización. El alta con origen abierto y el borrado están tomados de la referencia de la API y no de una corrida; está anotado en el To-do. Antes de borrar ninguna regla, comprueba con C.5 que las nuevas hacen lo que se espera.
+
+#### C.5 Verificación desde fuera
+
+Se hace desde una máquina que no sea el servidor, y conviene repetirla después de cada cambio de reglas, aquí o en UFW.
+
+```bash
+nc -zv -w 5 <ip-publica> <puerto-ssh>                # debe conectar
+nc -zv -w 5 <ip-publica> 22                          # debe agotar el tiempo
+nc -zv -w 5 <ip-publica> 443                         # según la fila de C.2 que aplique
+nc -zv -w 5 <ip-publica> <puerto-de-un-contenedor>   # debe agotar el tiempo
+```
+
+La respuesta distingue tres situaciones. Si conecta, el puerto está abierto en los dos firewalls y hay un servicio escuchando. Si agota el tiempo, alguno de los dos descarta los paquetes, que es lo deseado en todo puerto que no deba ser público. Si devuelve `connection refused`, los paquetes llegan a la máquina y no hay servicio escuchando: el camino de red está abierto aunque hoy no responda nadie, y el día que algo escuche en ese puerto quedará expuesto.
+
+Con el servicio detrás de un borde, la prueba del 443 debe agotar el tiempo desde cualquier máquina que no pertenezca al borde. Y la última prueba es la que importa en un servidor con contenedores: un puerto publicado por un contenedor que conecta desde fuera está expuesto, diga lo que diga `ufw status`.
+
+#### C.6 Mantenimiento
+
+Las reglas del proveedor no se respaldan con el servidor ni aparecen en ninguno de sus registros, así que su documentación es el inventario de 20.1 y el diagrama de 20.2. Cada regla tiene que poder explicarse con una fila de C.2; la que no, se borra.
+
+En la revisión mensual, junto con la comprobación de rangos de 9.6:
+
+```bash
+az network nsg rule list -g "${RG:?}" --nsg-name "${NSG:?}" -o table
+```
+
+Cuando la lista del borde cambia, se actualizan las reglas existentes en lugar de crear otras, en la misma sesión en que se actualiza UFW:
+
+```bash
+az network nsg rule update -g "${RG:?}" --nsg-name "${NSG:?}" -n Web-borde-v4 \
+  --source-address-prefixes $(cat /tmp/rangos-v4.txt)
+
+az network nsg rule update -g "${RG:?}" --nsg-name "${NSG:?}" -n Web-borde-v6 \
+  --source-address-prefixes $(cat /tmp/rangos-v6.txt)
+```
+
+Y cuando cambia la dirección del administrador, la de SSH:
+
+```bash
+az network nsg rule update -g "${RG:?}" --nsg-name "${NSG:?}" -n SSH-admin \
+  --source-address-prefixes "$(curl -s https://api.ipify.org)"
+```
+
+> Si la dirección cambió y ya no se puede entrar por SSH, esta última orden es la vía de recuperación, y funciona porque se ejecuta desde la estación contra la API del proveedor y no contra el servidor. Es una razón más para no guardar la sesión de `az` en la máquina que se administra.
+
+En Hostinger, la revisión mensual es el listado de C.4, que además dice si el grupo quedó sin sincronizar después de algún cambio hecho desde el panel. Cuando la lista del borde cambia no hay regla que actualizar, porque cada rango es una regla: los rangos nuevos se dan de alta con el bucle de C.4 sobre un archivo que contenga solo esos, se sincroniza, y al final se borran por su identificador las reglas de los rangos retirados y se sincroniza otra vez.
 
 ---
 
