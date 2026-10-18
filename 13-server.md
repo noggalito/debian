@@ -1,11 +1,19 @@
 # Despliegue de Debian 13 Trixie server
 
-Este documento describe las acciones necesarias para dejar listo un sistema Debian 13.7 Trixie server para las operaciones cotidianas, haciendo énfasis en la seguridad (hardening). El manual tiene un enfoque generalista, sirve como base para cualquier servidor, y como punto de partida. Luego, cada servidor específico deberá desplegar las acciones según su particularidad.
+Deja un Debian 13.7 Trixie server listo para operar, con énfasis en el endurecimiento. Es un manual base: agnóstico del proveedor y del rol, con pasos que se pueden repetir sin efectos. Cada rol añade lo suyo en su propio manual, y lo particular de cada proveedor está en [`proveedores/`](proveedores/).
+
+Las subsecciones que empiezan por **Opcional** son recomendables pero no imprescindibles: dependen del entorno (físico o VPS), del rol o de los requisitos de auditoría. El resto es la base que necesita cualquier servidor.
 
 <p style="text-align: center"><img src="./assets/logo debian.png" style="width: 25%;" alt="Debian" /></p>
 
 ## a. Historial de cambios
 
+- [0.10] – 2026-10-18
+  - Primera ejecución completa sobre un VPS de nube; las salidas de ejemplo pasan a ser las observadas y los pasos se hacen repetibles (`install` con permisos explícitos, líneas añadidas solo si faltan)
+  - Reorganización y renumeración: plantillas en §3, aprovisionamiento del proveedor en §5, firewall del proveedor en §11.6, diagnóstico como único anexo y referencias al final
+  - Lo propio de cada proveedor pasa a `proveedores/`, y la restricción a un CDN y el análisis de logs web al manual de Caddy. Se retiran rkhunter y las secciones redundantes
+  - Correcciones de fondo en PAM y faillock (§9.3.3), SSH (§10), auditd y AIDE (§14), AppArmor con auditd (§15.3), journald (§18) y msmtp (§21)
+  - Prosa reducida a la mitad sin tocar los comandos; las subsecciones recomendables se marcan como **Opcional**
 - [0.9] – 2026-10-09
   - El Anexo C de reenvío de correo con `msmtp` pasa a ser la sección 19 de la Etapa IV, y la documentación operativa pasa a ser la sección 20. Todas las referencias internas quedan renumeradas
   - §9.6 reescrita: aviso de que no se ejecuta en el despliegue base, descarga de los rangos a un archivo con comprobación antes de tocar ninguna regla, retiro de las reglas abiertas por número y comprobación mensual de la lista publicada
@@ -42,21 +50,24 @@ Este documento describe las acciones necesarias para dejar listo un sistema Debi
 ## b. To-do
 
 - Nuevo manual de reenvío de logs a un servidor central con `systemd-journal-upload` y `systemd-journal-remote`
-- Evaluar y documentar CrowdSec como complemento o sustituto de fail2ban (§10.5). Requiere validación en entorno propio antes de escribirse como procedimiento: agente, escenarios, lista comunitaria y componente AppSec
-- Más precisión y profundidad en el uso de `borg` para respaldos
+- Evaluar y documentar CrowdSec como complemento o sustituto de fail2ban (§12.5). Requiere validación en entorno propio antes de escribirse como procedimiento: agente, escenarios, lista comunitaria y componente AppSec
+- Ejecutar y validar la sección 20 (respaldos) con la versión 0.10, con más profundidad en el uso de `borg`
 - Inclusión de Ansible
-- Evaluar Forward Secure Sealing (FSS) del journal para servidores con requisitos de auditoría (§16.1.2)
+- Evaluar Forward Secure Sealing (FSS) del journal para servidores con requisitos de auditoría (§18.1.2)
 - Inclusión de Health Check, monitoreo y alerta, con uso de mensajería instantánea (Telegram) o correo electrónico
-- Inclusión de referencias al final
-- Verificar en entorno propio las órdenes de `az` del Anexo C.3. Están tomadas de la referencia de la CLI de Azure y no de una corrida completa
-- Verificar en entorno propio las dos órdenes del Anexo C.4 que no se han ejecutado contra la API de Hostinger: el alta de una regla con origen abierto y el borrado de una regla por su identificador
-- Añadir al Anexo C el procedimiento equivalente para otros proveedores a medida que se usen
-- Documentar el filtrado de puertos publicados por contenedores en el propio host, para servidores sin firewall de proveedor (Anexo C.1)
-- Verificar sobre un servidor con contenedores la exclusión de AIDE de §12.4 y revisar el primer reporte diario posterior
+- Verificar en entorno propio las órdenes de `az` de [`proveedores/azure.md`](proveedores/azure.md). Están tomadas de la referencia de la CLI de Azure y no de una corrida completa
+- Verificar en entorno propio las dos órdenes de [`proveedores/hostinger.md`](proveedores/hostinger.md) que no se han ejecutado contra la API de Hostinger: el alta de una regla con origen abierto y el borrado de una regla por su identificador
+- Añadir a `proveedores/` el documento de cada proveedor nuevo a medida que se use
+- Validar en VM un perfil de `pam-auth-update` para `pam_faillock` en `/usr/share/pam-configs/` (§9.3.3), de modo que la pila sobreviva a la regeneración del bloque gestionado. Ubuntu documenta uno con `preauth` como `requisite`; hay que comprobar la pila resultante y repetir las pruebas de bloqueo antes de sustituir la edición manual
+- Comprobar desde un segundo servidor en la misma subred de Contabo si el tráfico entre vecinos depende de `/etc/cron.d/staticroute` ([`proveedores/contabo.md`](proveedores/contabo.md), sección 4). La salida a internet ya se comprobó que no depende
+- Documentar el filtrado de puertos publicados por contenedores en el propio host, para servidores sin firewall de proveedor (11.6.1)
+- Verificar sobre un servidor con contenedores la exclusión de AIDE de §14.3 y revisar el primer reporte diario posterior
+- Revisar la primera ejecución de `dailyaidecheck.timer` en un despliegue nuevo: si su informe sale por `msmtp` aunque el servicio corre como `_aide` y no como root, y dónde queda su registro. Con el resultado se corrige la frase de §21.8 que dice que los servicios del sistema corren como root
+- Cerrar las validaciones que el texto marca como pendientes: la respuesta "No" al diálogo de `pam-auth-update` (§9.3.3), el primer check de AIDE con las exclusiones aplicadas desde el inicio (§14.3), la purga de los perfiles adicionales con `aa-remove-unknown` (§15.3) y el significado del aviso `No buffer space available` de auditd (§18.1.2)
 
 ## c. Requerimientos previos
 
-- Llave SSH Ed25519 para el punto "4.2 Copia de la llave pública del administrador". Manual para generarla disponible [aquí](https://github.com/noggalito/llave-ssh)
+- Llave SSH Ed25519 para el punto "6.2 Copia de la llave pública del administrador". Manual para generarla disponible [aquí](https://github.com/noggalito/llave-ssh)
 - Una cuenta de correo electrónico (a veces con contraseña por aplicación) desde donde se enviarán las notificaciones del servidor
 
 ---
@@ -72,7 +83,6 @@ Este documento describe las acciones necesarias para dejar listo un sistema Debi
 - [1.3 Descarga de ISO y archivos de verificación](#13-descarga-de-iso-y-archivos-de-verificación)
 - [1.4 Verificación de la firma GPG de los checksums](#14-verificación-de-la-firma-gpg-de-los-checksums)
 - [1.5 Verificación del hash de la ISO](#15-verificación-del-hash-de-la-iso)
-- [1.6 Verificación integral (opcional, para scripts)](#16-verificación-integral-opcional-para-scripts)
 
 #### 2. Instalación del sistema base
 
@@ -84,197 +94,190 @@ Este documento describe las acciones necesarias para dejar listo un sistema Debi
 
 ### Etapa II — Configuración base del sistema
 
-#### 3. Preparación mínima para administración
+#### 3. Plantillas y variables del manual
 
-- [3.1 Diagnóstico de instalación de `sudo`](#31-diagnóstico-de-instalación-de-sudo)
-- [3.2 Instalación de `sudo`](#32-instalación-de-sudo)
-- [3.3 Activación de la pertenencia al grupo](#33-activación-de-la-pertenencia-al-grupo)
+- [3.1 Convenciones del sistema de plantillas](#31-convenciones-del-sistema-de-plantillas)
+- [3.2 Inventario de plantillas](#32-inventario-de-plantillas)
+- [3.3 Resumen de variables del manual](#33-resumen-de-variables-del-manual)
+- [3.4 Modificación local de plantillas](#34-modificación-local-de-plantillas)
 
-#### 4. Acceso remoto inicial
+#### 4. Preparación mínima para administración
 
-- [4.1 Verificación del servidor SSH](#41-verificación-del-servidor-ssh)
-- [4.2 Copia de la llave pública del administrador](#42-copia-de-la-llave-pública-del-administrador)
-- [4.3 Verificación del acceso por llave](#43-verificación-del-acceso-por-llave)
-- [4.4 Mantener el canal de rescate abierto](#44-mantener-el-canal-de-rescate-abierto)
+- [4.1 Diagnóstico de instalación de `sudo`](#41-diagnóstico-de-instalación-de-sudo)
+- [4.2 Instalación de `sudo`](#42-instalación-de-sudo)
+- [4.3 Activación de la pertenencia al grupo](#43-activación-de-la-pertenencia-al-grupo)
 
-#### 5. Configuración regional y de identidad
+#### 5. Revisión del aprovisionamiento del proveedor
 
-- [5.1 Hostname](#51-hostname)
-- [5.2 Archivo `/etc/hosts`](#52-archivo-etchosts)
-- [5.3 Zona horaria](#53-zona-horaria)
-- [5.4 Locales](#54-locales)
-- [5.5 Red](#55-red)
-- [5.6 `machine-id`](#56-machine-id)
+- [5.1 Revisión tras el primer arranque](#51-revisión-tras-el-primer-arranque)
+- [5.2 Reglas heredadas del aprovisionamiento (VPS con cloud-init)](#52-reglas-heredadas-del-aprovisionamiento-vps-con-cloud-init)
 
-#### 6. Repositorios y primera actualización completa
+#### 6. Acceso remoto inicial
 
-- [6.1 Respaldo del `sources.list` original](#61-respaldo-del-sourceslist-original)
-- [6.2 Edición del `sources.list`](#62-edición-del-sourceslist)
-- [6.3 Actualización completa](#63-actualización-completa)
-- [6.4 Reinicio si fue actualizado el kernel](#64-reinicio-si-fue-actualizado-el-kernel)
+- [6.1 Verificación del servidor SSH](#61-verificación-del-servidor-ssh)
+- [6.2 Copia de la llave pública del administrador](#62-copia-de-la-llave-pública-del-administrador)
+- [6.3 Verificación del acceso por llave](#63-verificación-del-acceso-por-llave)
+- [6.4 Mantener el canal de rescate abierto](#64-mantener-el-canal-de-rescate-abierto)
 
-#### 7. Usuarios y privilegios
+#### 7. Configuración regional y de identidad
 
-- [7.1 Verificación del usuario administrativo](#71-verificación-del-usuario-administrativo)
-- [7.2 Grupos recomendados para el usuario administrativo](#72-grupos-recomendados-para-el-usuario-administrativo)
-- [7.3 Hardening de sudo](#73-hardening-de-sudo)
-- [7.4 Política de contraseñas](#74-política-de-contraseñas)
-- [7.5 Creación de usuarios adicionales (si aplica)](#75-creación-de-usuarios-adicionales-si-aplica)
-- [7.6 Bloqueo de la cuenta de root](#76-bloqueo-de-la-cuenta-de-root)
+- [7.1 Hostname](#71-hostname)
+- [7.2 Archivo `/etc/hosts`](#72-archivo-etchosts)
+- [7.3 Zona horaria](#73-zona-horaria)
+- [7.4 Locales](#74-locales)
+- [7.5 Red](#75-red)
+- [7.6 `machine-id`](#76-machine-id)
+
+#### 8. Repositorios y primera actualización completa
+
+- [8.1 Respaldo del `sources.list` original](#81-respaldo-del-sourceslist-original)
+- [8.2 Edición del `sources.list`](#82-edición-del-sourceslist)
+- [8.3 Actualización completa](#83-actualización-completa)
+- [8.4 Reinicio si fue actualizado el kernel](#84-reinicio-si-fue-actualizado-el-kernel)
+
+#### 9. Usuarios y privilegios
+
+- [9.1 Verificación del usuario administrativo](#91-verificación-del-usuario-administrativo)
+- [9.2 Grupos recomendados para el usuario administrativo](#92-grupos-recomendados-para-el-usuario-administrativo)
+- [9.3 Hardening de sudo](#93-hardening-de-sudo)
+- [9.4 Política de contraseñas](#94-política-de-contraseñas)
+- [9.5 Creación de usuarios adicionales (si aplica)](#95-creación-de-usuarios-adicionales-si-aplica)
+- [9.6 Bloqueo de la cuenta de root](#96-bloqueo-de-la-cuenta-de-root)
 
 ### Etapa III — Hardening
 
-#### 8. Hardening de SSH
+#### 10. Hardening de SSH
 
-- [8.1 Archivo modular `/etc/ssh/sshd_config.d/01-hardening.conf`](#81-archivo-modular-etcsshsshd_configd01-hardeningconf)
-- [8.2 Cambio de puerto, password auth y solo pubkey](#82-cambio-de-puerto-password-auth-y-solo-pubkey)
-- [8.3 Restricción de usuarios (`AllowUsers`)](#83-restricción-de-usuarios-allowusers)
-- [8.4 Límites de sesión y timeouts](#84-límites-de-sesión-y-timeouts)
-- [8.5 Algoritmos criptográficos modernos](#85-algoritmos-criptográficos-modernos)
-- [8.6 Validación y recarga segura](#86-validación-y-recarga-segura)
+- [10.1 Archivo modular `/etc/ssh/sshd_config.d/01-hardening.conf`](#101-archivo-modular-etcsshsshd_configd01-hardeningconf)
+- [10.2 Cambio de puerto, password auth y solo pubkey](#102-cambio-de-puerto-password-auth-y-solo-pubkey)
+- [10.3 Restricción de usuarios (`AllowUsers`)](#103-restricción-de-usuarios-allowusers)
+- [10.4 Límites de sesión y timeouts](#104-límites-de-sesión-y-timeouts)
+- [10.5 Algoritmos criptográficos modernos](#105-algoritmos-criptográficos-modernos)
+- [10.6 Validación y recarga segura](#106-validación-y-recarga-segura)
 
-#### 9. Firewall (UFW)
+#### 11. Firewall (UFW)
 
-- [9.1 Instalación y políticas por defecto](#91-instalación-y-políticas-por-defecto)
-- [9.2 IPv6 (`/etc/default/ufw`)](#92-ipv6-etcdefaultufw)
-- [9.3 Apertura selectiva de puertos según rol](#93-apertura-selectiva-de-puertos-según-rol)
-- [9.4 Inspección antes de activar](#94-inspección-antes-de-activar)
-- [9.5 Activación final y verificación](#95-activación-final-y-verificación)
-- [9.6 Restricción del origen a un proxy de borde o CDN](#96-restricción-del-origen-a-un-proxy-de-borde-o-cdn)
+- [11.1 Instalación y políticas por defecto](#111-instalación-y-políticas-por-defecto)
+- [11.2 IPv6 (`/etc/default/ufw`)](#112-ipv6-etcdefaultufw)
+- [11.3 Apertura selectiva de puertos según rol](#113-apertura-selectiva-de-puertos-según-rol)
+- [11.4 Inspección antes de activar](#114-inspección-antes-de-activar)
+- [11.5 Activación final y verificación](#115-activación-final-y-verificación)
+- [11.6 Firewall del proveedor de nube](#116-firewall-del-proveedor-de-nube)
 
-#### 10. Protección contra fuerza bruta (fail2ban)
+#### 12. Protección contra fuerza bruta (fail2ban)
 
-- [10.1 Instalación](#101-instalación)
-- [10.2 Configuración local (`jail.local`)](#102-configuración-local-jaillocal)
-- [10.3 Activación](#103-activación)
-- [10.4 Monitoreo de bans](#104-monitoreo-de-bans)
-- [10.5 Límites del modelo por IP](#105-límites-del-modelo-por-ip)
+- [12.1 Instalación](#121-instalación)
+- [12.2 Configuración local (`jail.local`)](#122-configuración-local-jaillocal)
+- [12.3 Activación](#123-activación)
+- [12.4 Monitoreo de bans](#124-monitoreo-de-bans)
+- [12.5 Límites del modelo por IP](#125-límites-del-modelo-por-ip)
 
-#### 11. Hardening del kernel y del sistema
+#### 13. Hardening del kernel y del sistema
 
-- [11.1 Parámetros sysctl de red y de kernel](#111-parámetros-sysctl-de-red-y-de-kernel)
-- [11.2 Límites de recursos (`/etc/security/limits.conf`)](#112-límites-de-recursos-etcsecuritylimitsconf)
-- [11.3 Deshabilitar módulos de kernel innecesarios](#113-deshabilitar-módulos-de-kernel-innecesarios)
-- [11.4 Protección de GRUB (solo bare metal)](#114-protección-de-grub-solo-bare-metal)
+- [13.1 Parámetros sysctl de red y de kernel](#131-parámetros-sysctl-de-red-y-de-kernel)
+- [13.2 Deshabilitar módulos de kernel innecesarios](#132-deshabilitar-módulos-de-kernel-innecesarios)
+- [13.3 Protección de GRUB (solo bare metal)](#133-protección-de-grub-solo-bare-metal)
+- [13.4 Servicios que escuchan en la red sin necesidad](#134-servicios-que-escuchan-en-la-red-sin-necesidad)
 
-#### 12. Auditoría y detección
+#### 14. Auditoría y detección
 
-- [12.1 `auditd` — reglas mínimas](#121-auditd--reglas-mínimas)
-- [12.2 `rkhunter` — escaneo de rootkits](#122-rkhunter--escaneo-de-rootkits)
-- [12.3 `debsums` — integridad de paquetes](#123-debsums--integridad-de-paquetes)
-- [12.4 AIDE — integridad de archivos del sistema](#124-aide--integridad-de-archivos-del-sistema)
-- [12.5 Revisión periódica de logs y registros](#125-revisión-periódica-de-logs-y-registros)
-- [12.6 `lynis` — auditoría periódica del baseline de seguridad](#126-lynis--auditoría-periódica-del-baseline-de-seguridad)
+- [14.1 `auditd` — reglas mínimas](#141-auditd--reglas-mínimas)
+- [14.2 `debsums` — integridad de paquetes](#142-debsums--integridad-de-paquetes)
+- [14.3 AIDE — integridad de archivos del sistema](#143-aide--integridad-de-archivos-del-sistema)
+- [14.4 Revisión periódica de logs y registros](#144-revisión-periódica-de-logs-y-registros)
+- [14.5 `lynis` — auditoría periódica del baseline de seguridad](#145-lynis--auditoría-periódica-del-baseline-de-seguridad)
 
-#### 13. AppArmor
+#### 15. AppArmor
 
-- [13.1 Verificación del estado](#131-verificación-del-estado)
-- [13.2 Perfiles en `enforce` vs `complain`](#132-perfiles-en-enforce-vs-complain)
-- [13.3 Añadir perfiles adicionales](#133-añadir-perfiles-adicionales)
+- [15.1 Verificación del estado](#151-verificación-del-estado)
+- [15.2 Perfiles en `enforce` vs `complain`](#152-perfiles-en-enforce-vs-complain)
+- [15.3 Perfiles adicionales](#153-perfiles-adicionales)
 
 #### [Cierre de la Etapa III](#cierre-de-la-etapa-iii)
 
 ### Etapa IV — Mantenimiento y actualizaciones
 
-#### 14. Actualizaciones automáticas
+#### 16. Actualizaciones automáticas
 
-- [14.1 Instalación](#141-instalación)
-- [14.2 Configuración de orígenes](#142-configuración-de-orígenes)
-- [14.3 Notificación por correo](#143-notificación-por-correo)
-- [14.4 Reinicio automático controlado](#144-reinicio-automático-controlado)
-- [14.5 Habilitación del flujo periódico](#145-habilitación-del-flujo-periódico)
-- [14.6 Verificación de los timers](#146-verificación-de-los-timers)
-- [14.7 Simulación antes de la primera ejecución real](#147-simulación-antes-de-la-primera-ejecución-real)
-- [14.8 Revisión de logs tras la primera ejecución](#148-revisión-de-logs-tras-la-primera-ejecución)
-- [14.9 Qué hacer después de un point release](#149-qué-hacer-después-de-un-point-release)
+- [16.1 Instalación](#161-instalación)
+- [16.2 Configuración de orígenes](#162-configuración-de-orígenes)
+- [16.3 Notificación por correo](#163-notificación-por-correo)
+- [16.4 Reinicio automático controlado](#164-reinicio-automático-controlado)
+- [16.5 Habilitación del flujo periódico](#165-habilitación-del-flujo-periódico)
+- [16.6 Verificación de los timers](#166-verificación-de-los-timers)
+- [16.7 Simulación antes de la primera ejecución real](#167-simulación-antes-de-la-primera-ejecución-real)
+- [16.8 Revisión de logs tras la primera ejecución](#168-revisión-de-logs-tras-la-primera-ejecución)
+- [16.9 Qué hacer después de un point release](#169-qué-hacer-después-de-un-point-release)
 
-#### 15. Sincronización de tiempo
+#### 17. Sincronización de tiempo
 
-- [15.1 Migración de `systemd-timesyncd` a `chrony`](#151-migración-de-systemd-timesyncd-a-chrony)
-- [15.2 Configuración de servidores NTP](#152-configuración-de-servidores-ntp)
-- [15.3 Verificación](#153-verificación)
-- [15.4 Comportamiento ante desviaciones grandes](#154-comportamiento-ante-desviaciones-grandes)
-- [15.5 Verificación cruzada con `timedatectl`](#155-verificación-cruzada-con-timedatectl)
+- [17.1 Migración de `systemd-timesyncd` a `chrony`](#171-migración-de-systemd-timesyncd-a-chrony)
+- [17.2 Configuración de servidores NTP](#172-configuración-de-servidores-ntp)
+- [17.3 Verificación](#173-verificación)
+- [17.4 Comportamiento ante desviaciones grandes](#174-comportamiento-ante-desviaciones-grandes)
+- [17.5 Verificación cruzada con `timedatectl`](#175-verificación-cruzada-con-timedatectl)
 
-#### 16. Logs y rotación
+#### 18. Logs y rotación
 
-- [16.1 Configuración de `journald`](#161-configuración-de-journald)
-- [16.2 `logrotate` para logs de aplicaciones](#162-logrotate-para-logs-de-aplicaciones)
-- [16.3 Reenvío a un servidor central (opcional)](#163-reenvío-a-un-servidor-central-opcional)
-- [16.4 Verificación de uso de disco](#164-verificación-de-uso-de-disco)
-- [16.5 Retención frente a necesidad forense](#165-retención-frente-a-necesidad-forense)
+- [18.1 Configuración de `journald`](#181-configuración-de-journald)
+- [18.2 `logrotate` para logs de aplicaciones](#182-logrotate-para-logs-de-aplicaciones)
+- [18.3 Verificación de uso de disco](#183-verificación-de-uso-de-disco)
+- [18.4 Retención frente a necesidad forense](#184-retención-frente-a-necesidad-forense)
 
-#### 17. Monitoreo básico
+#### 19. Monitoreo básico
 
-- [17.1 Herramientas de consulta puntual](#171-herramientas-de-consulta-puntual)
-- [17.2 Alertas mínimas vía cron](#172-alertas-mínimas-vía-cron)
-- [17.3 Estado de servicios críticos](#173-estado-de-servicios-críticos)
+- [19.1 Herramientas de consulta puntual](#191-herramientas-de-consulta-puntual)
+- [19.2 Alertas mínimas vía cron](#192-alertas-mínimas-vía-cron)
+- [19.3 Estado de servicios críticos](#193-estado-de-servicios-críticos)
 
-#### 18. Respaldos
+#### 20. Respaldos
 
-- [18.1 Estrategia 3-2-1](#181-estrategia-3-2-1)
-- [18.2 Qué respaldar](#182-qué-respaldar)
-- [18.3 BorgBackup](#183-borgbackup)
-- [18.4 Verificación del repositorio](#184-verificación-del-repositorio)
-- [18.5 Prueba de restauración](#185-prueba-de-restauración)
-- [18.6 Restauración del servidor desde cero](#186-restauración-del-servidor-desde-cero)
+- [20.1 Estrategia 3-2-1](#201-estrategia-3-2-1)
+- [20.2 Qué respaldar](#202-qué-respaldar)
+- [20.3 BorgBackup](#203-borgbackup)
+- [20.4 Verificación del repositorio](#204-verificación-del-repositorio)
+- [20.5 Prueba de restauración](#205-prueba-de-restauración)
+- [20.6 Restauración del servidor desde cero](#206-restauración-del-servidor-desde-cero)
 
-#### 19. Reenvío de correo del sistema con `msmtp`
+#### 21. Reenvío de correo del sistema con `msmtp`
 
-- [19.1 Decisiones de diseño](#191-decisiones-de-diseño)
-- [19.2 Requisitos previos](#192-requisitos-previos)
-- [19.3 Instalación](#193-instalación)
-- [19.4 Configuración global de msmtp](#194-configuración-global-de-msmtp)
-- [19.5 Contraseña del relay](#195-contraseña-del-relay)
-- [19.6 Aliases para destinatarios locales](#196-aliases-para-destinatarios-locales)
-- [19.7 Configuración de mailutils](#197-configuración-de-mailutils)
-- [19.8 Grupo `msmtp` para el usuario administrativo](#198-grupo-msmtp-para-el-usuario-administrativo)
-- [19.9 Prueba de envío directo](#199-prueba-de-envío-directo)
-- [19.10 Prueba de redirección de aliases](#1910-prueba-de-redirección-de-aliases)
-- [19.11 Prueba con el flujo completo del sistema](#1911-prueba-con-el-flujo-completo-del-sistema)
-- [19.12 Consideraciones de seguridad](#1912-consideraciones-de-seguridad)
-- [19.13 Logs](#1913-logs)
+- [21.1 Decisiones de diseño](#211-decisiones-de-diseño)
+- [21.2 Requisitos previos](#212-requisitos-previos)
+- [21.3 Instalación](#213-instalación)
+- [21.4 Configuración global de msmtp](#214-configuración-global-de-msmtp)
+- [21.5 Contraseña del relay](#215-contraseña-del-relay)
+- [21.6 Aliases para destinatarios locales](#216-aliases-para-destinatarios-locales)
+- [21.7 Configuración de mailutils](#217-configuración-de-mailutils)
+- [21.8 Grupo `msmtp` para el usuario administrativo](#218-grupo-msmtp-para-el-usuario-administrativo)
+- [21.9 Prueba de envío directo](#219-prueba-de-envío-directo)
+- [21.10 Prueba de redirección de aliases](#2110-prueba-de-redirección-de-aliases)
+- [21.11 Prueba con el flujo completo del sistema](#2111-prueba-con-el-flujo-completo-del-sistema)
+- [21.12 Consideraciones de seguridad](#2112-consideraciones-de-seguridad)
+- [21.13 Logs](#2113-logs)
 
-#### 20. Documentación operativa
+#### 22. Documentación operativa
 
-- [20.1 Inventario del servidor](#201-inventario-del-servidor)
-- [20.2 Diagrama lógico](#202-diagrama-lógico)
-- [20.3 Runbook básico](#203-runbook-básico)
-- [20.4 Mantenimiento de la documentación](#204-mantenimiento-de-la-documentación)
+- [22.1 Inventario del servidor](#221-inventario-del-servidor)
+- [22.2 Diagrama lógico](#222-diagrama-lógico)
+- [22.3 Runbook básico](#223-runbook-básico)
+- [22.4 Mantenimiento de la documentación](#224-mantenimiento-de-la-documentación)
 
 #### [Cierre de la Etapa IV](#cierre-de-la-etapa-iv)
 
-### Anexos
+### Anexo A — Diagnóstico rápido post-incidente
 
-#### Anexo A — Índice consolidado de plantillas
+- [A.1 Imagen general del sistema](#a1-imagen-general-del-sistema)
+- [A.2 Síntoma: el servidor está lento o no responde](#a2-síntoma-el-servidor-está-lento-o-no-responde)
+- [A.3 Síntoma: un servicio no funciona](#a3-síntoma-un-servicio-no-funciona)
+- [A.4 Síntoma: el disco está lleno](#a4-síntoma-el-disco-está-lleno)
+- [A.5 Síntoma: no puedo conectar por SSH](#a5-síntoma-no-puedo-conectar-por-ssh)
+- [A.6 Síntoma: red sin conectividad](#a6-síntoma-red-sin-conectividad)
+- [A.7 Síntoma: alerta de fail2ban con muchas IPs baneadas](#a7-síntoma-alerta-de-fail2ban-con-muchas-ips-baneadas)
+- [A.8 Síntoma: el sistema no arrancó del todo](#a8-síntoma-el-sistema-no-arrancó-del-todo)
+- [A.9 Recolección de evidencia para análisis posterior](#a9-recolección-de-evidencia-para-análisis-posterior)
+- [A.10 Cuándo escalar](#a10-cuándo-escalar)
 
-- [A.1 Convenciones del sistema de plantillas](#a1-convenciones-del-sistema-de-plantillas)
-- [A.2 Inventario de plantillas](#a2-inventario-de-plantillas)
-- [A.3 Resumen de variables del manual](#a3-resumen-de-variables-del-manual)
-- [A.4 Modificación local de plantillas](#a4-modificación-local-de-plantillas)
-
-#### Anexo B — Diagnóstico rápido post-incidente
-
-- [B.1 Imagen general del sistema](#b1-imagen-general-del-sistema)
-- [B.2 Síntoma: el servidor está lento o no responde](#b2-síntoma-el-servidor-está-lento-o-no-responde)
-- [B.3 Síntoma: un servicio no funciona](#b3-síntoma-un-servicio-no-funciona)
-- [B.4 Síntoma: el disco está lleno](#b4-síntoma-el-disco-está-lleno)
-- [B.5 Síntoma: no puedo conectar por SSH](#b5-síntoma-no-puedo-conectar-por-ssh)
-- [B.6 Síntoma: red sin conectividad](#b6-síntoma-red-sin-conectividad)
-- [B.7 Síntoma: alerta de fail2ban con muchas IPs baneadas](#b7-síntoma-alerta-de-fail2ban-con-muchas-ips-baneadas)
-- [B.8 Síntoma: el sistema no arrancó del todo](#b8-síntoma-el-sistema-no-arrancó-del-todo)
-- [B.9 Recolección de evidencia para análisis posterior](#b9-recolección-de-evidencia-para-análisis-posterior)
-- [B.10 Cuándo escalar](#b10-cuándo-escalar)
-- [B.11 Síntoma: volumen anómalo de peticiones en un servicio web](#b11-síntoma-volumen-anómalo-de-peticiones-en-un-servicio-web)
-
-#### Anexo C — Firewall del proveedor de nube
-
-- [C.1 Dos firewalls, dos alcances](#c1-dos-firewalls-dos-alcances)
-- [C.2 Reglas según el momento del despliegue](#c2-reglas-según-el-momento-del-despliegue)
-- [C.3 Azure: grupo de seguridad de red](#c3-azure-grupo-de-seguridad-de-red)
-- [C.4 Hostinger: firewall del VPS](#c4-hostinger-firewall-del-vps)
-- [C.5 Verificación desde fuera](#c5-verificación-desde-fuera)
-- [C.6 Mantenimiento](#c6-mantenimiento)
+### [Referencias](#referencias)
 
 ---
 
@@ -282,7 +285,7 @@ Este documento describe las acciones necesarias para dejar listo un sistema Debi
 
 ### 1. Descarga y validación de la ISO
 
-Directorio de [netinst](https://cdimage.debian.org/debian-cd/current/amd64/bt-cd/)
+Solo aplica cuando se instala desde ISO. Si el proveedor entrega Debian preinstalado, se pasa a la sección 2.5. La imagen es la [netinst](https://cdimage.debian.org/debian-cd/current/amd64/bt-cd/).
 
 #### 1.1 Variables de trabajo
 
@@ -298,26 +301,18 @@ mkdir -p "${WORKDIR}"
 cd "${WORKDIR}"
 ```
 
-> **Nota:** se usa la ruta versionada (`/${DEBIAN_VER}/`) en lugar de `current/` para que la verificación sea reproducible y no cambie bajo los pies si Debian publica una nueva versión puntual durante el proceso.
->
-> Las imágenes de un point release se publican poco después del anuncio, no el
-> mismo minuto. Si la ruta versionada devuelve 404, hay dos caminos válidos:
-> esperar unas horas, o instalar con la imagen del point release anterior y
-> subir a 13.7 con `apt full-upgrade` en la sección 6. El resultado final es
-> idéntico; solo cambia cuántos paquetes se descargan después de instalar.
+Se usa la ruta versionada (`/${DEBIAN_VER}/`) y no `current/`, para que la verificación no cambie si Debian publica otra versión durante el proceso. Si la ruta da 404 porque el point release aún no tiene imágenes, se espera unas horas o se instala con la versión anterior y se sube con `apt full-upgrade` en la sección 8.
 
 #### 1.2 Importación y verificación de la clave de firmado
-
-La clave de firmado de las imágenes de CD/DVD de Debian se obtiene directamente del keyserver
 
 ```bash
 gpg --keyserver hkps://keyring.debian.org --recv-keys "${CD_SIGNING_KEY}"
 gpg --fingerprint "${CD_SIGNING_KEY}"
 ```
 
-Confirmar que la huella mostrada coincide **exactamente** con la publicada en la página oficial: <https://www.debian.org/CD/verify>. Huella esperada:
+La huella debe coincidir **exactamente** con la publicada en <https://www.debian.org/CD/verify>:
 
-```
+```text
 DF9B 9C49 EAA9 2984 3258  9D76 DA87 E80D 6294 BE9B
 ```
 
@@ -329,7 +324,7 @@ wget -c "${MIRROR}/SHA512SUMS.sign"
 wget -c "${MIRROR}/${ISO_NAME}"
 ```
 
-La opción `-c` permite reanudar descargas interrumpidas sin volver a empezar.
+`-c` reanuda descargas interrumpidas.
 
 #### 1.4 Verificación de la firma GPG de los checksums
 
@@ -337,9 +332,9 @@ La opción `-c` permite reanudar descargas interrumpidas sin volver a empezar.
 gpg --verify SHA512SUMS.sign SHA512SUMS
 ```
 
-Resultado esperado (la fecha variará según la publicación del release):
+Resultado esperado (la fecha varía):
 
-```
+```text
 gpg: Firmado el sáb 12 set 2026 11:20:46 -05
 gpg:                usando RSA clave DF9B9C49EAA9298432589D76DA87E80D6294BE9B
 gpg: Firma correcta de "Debian CD signing key <debian-cd@lists.debian.org>" [desconocido]
@@ -348,7 +343,7 @@ gpg:          No hay indicios de que la firma pertenezca al propietario.
 Huellas dactilares de la clave primaria: DF9B 9C49 EAA9 2984 3258  9D76 DA87 E80D 6294 BE9B
 ```
 
-> La advertencia "no está certificada por una firma de confianza" es normal y se resuelve manualmente comparando la huella con la web oficial (paso 1.2). Lo crítico es que diga "Firma correcta".
+El aviso "no está certificada por una firma de confianza" es normal; la huella ya se comprobó en 1.2. Lo que cuenta es "Firma correcta".
 
 #### 1.5 Verificación del hash de la ISO
 
@@ -358,64 +353,35 @@ sha512sum --ignore-missing -c SHA512SUMS
 
 Resultado esperado:
 
-```
+```text
 debian-13.7.0-amd64-netinst.iso: La suma coincide
 ```
 
-La opción `--ignore-missing` evita mensajes de error por las decenas de otras
-ISOs listadas en `SHA512SUMS` que no se descargaron (DVD completo, arquitecturas
-alternativas, etc.).
-
-#### 1.6 Verificación integral (opcional, para scripts)
-
-Si se automatiza la descarga, conviene validar todo el flujo con códigos de
-salida explícitos:
+`--ignore-missing` evita errores por las demás ISO de `SHA512SUMS` que no se descargaron. Con la ISO verificada, se saca del directorio de trabajo (aquí, al directorio personal) y se borra el resto:
 
 ```bash
-gpg --verify SHA512SUMS.sign SHA512SUMS \
-  && sha512sum --ignore-missing -c SHA512SUMS \
-  && echo "✓ ISO verificada y lista para usarse" \
-  || echo "✗ FALLÓ la verificación — NO usar esta ISO"
-```
-
-Finalmente, reubicar la ISO en la carpeta deseada y borrar el directorio $WORKDIR
-
-```bash
+mv "${WORKDIR}/${ISO_NAME}" ~/
 cd
-rm -fR "$WORKDIR"
+rm -fR "${WORKDIR}"
 ```
 
 ### 2. Instalación del sistema base
 
-Esta sección cubre la instalación inicial de Debian 13 Trixie como servidor, con un enfoque generalista aplicable a tres escenarios:
+Cubre tres escenarios: hardware físico, máquina virtual local y VPS. En un VPS el proveedor suele entregar el sistema instalado, y de esta sección solo aplican 2.2.3 y 2.5. El objetivo es un sistema que arranca, accesible por consola o SSH.
 
-- Hardware físico (bare metal): control total sobre particionado, firmware, consola.
-- Máquina virtual local (KVM/libvirt, VirtualBox, VMware Workstation): instalación desde ISO montada virtualmente.
-- VPS en la nube (DigitalOcean, Hetzner, AWS, etc.): generalmente el proveedor ya entrega un sistema preinstalado; esta sección indica qué pasos se omiten y qué se verifica.
-
-El objetivo es llegar a un sistema arrancable, accesible por consola (o SSH en caso de VPS), y listo para la configuración posterior descrita en secciones siguientes.
+Lo que queda fuera: la IP estática definitiva (sección 7.5), los agentes de cada plataforma (QEMU guest agent, open-vm-tools) y el microcódigo, que llega con los repositorios de la sección 8. Los manuales de rol añaden sus propios ajustes de particionado, recursos y red.
 
 #### 2.1 Consideraciones previas al instalador
 
 ##### 2.1.1 Modo de arranque: UEFI vs BIOS legacy
 
-Debian 13 soporta ambos, pero para despliegues nuevos se recomienda UEFI por las siguientes razones:
-
-- Compatibilidad nativa con discos grandes (>2 TiB) sin recurrir a trucos.
-- Posibilidad futura de Secure Boot si el rol lo exige.
-- Mejor soporte en hypervisores modernos (KVM con OVMF, VirtualBox EFI, cloud).
-
-En VPS este parámetro suele estar fijado por el proveedor y no es negociable. En VM local, habilitar firmware EFI en la definición (`virt-manager` → *Customize before install* → *Overview* → *Firmware: UEFI*). En bare metal, verificar en la BIOS/UEFI que el modo sea UEFI puro (no CSM/Legacy).
+Para despliegues nuevos, UEFI: discos de más de 2 TiB, Secure Boot si hiciera falta y mejor soporte en hipervisores. En VPS lo fija el proveedor. En una VM local se activa en la definición (`virt-manager` → *Customize before install* → *Overview* → *Firmware: UEFI*); en bare metal, UEFI puro, sin CSM.
 
 ##### 2.1.2 Medio de instalación
 
-- Físico: pendrive flasheado con la ISO `netinst` verificada en la sección 1. Usar `dd` o herramientas equivalentes; evitar Rufus en modo ISO + partición (puede introducir ambigüedades en GPT).
-- VM local: la ISO se conecta como CD-ROM virtual. No es necesario flashearla.
-- VPS: casi siempre no aplica. El proveedor ofrece una plantilla de Debian 13 preinstalada. Si el VPS permite ISO personalizada (Hetzner, algunos OVH), se puede seguir el flujo de instalación manual; si no, se parte del sistema entregado y se salta a la sección 2.5.
+En físico, un pendrive con la ISO verificada, grabado con `dd` (Rufus en modo ISO + partición puede dejar ambigüedades en GPT). En VM, la ISO como CD-ROM virtual. En VPS casi nunca aplica: si el proveedor no admite ISO propia, se parte del sistema entregado y se salta a 2.5.
 
 ##### 2.1.3 Recursos mínimos recomendados
-
-Para un servidor base Debian 13 sin servicios adicionales:
 
 | Recurso | Mínimo     | Recomendado base |
 |---------|------------|------------------|
@@ -424,17 +390,15 @@ Para un servidor base Debian 13 sin servicios adicionales:
 | Disco   | 8 GB       | 20 GB            |
 | Red     | 1 interfaz | 1 interfaz       |
 
-El dimensionamiento real depende del rol final (mail, web, Odoo, etc.) y se ajusta en los manuales específicos que extiendan éste.
+El dimensionamiento real lo fija el manual del rol.
 
 #### 2.2 Estrategia de particionado
 
-El instalador de Debian ofrece esquemas guiados y manuales. Para un servidor, lo razonable es siempre manual (o guiado con revisión posterior), porque el particionado es una decisión difícil de revertir.
+En VPS solo aplica 2.2.3. En instalaciones propias, el particionado se hace a mano o con el guiado revisado, porque es difícil de revertir.
 
 ##### 2.2.1 Esquema base recomendado (sin cifrado)
 
-Para servidores sencillos donde el cifrado no es requisito:
-
-```
+```text
 /dev/sda1  →  /boot/efi   (EFI System Partition, 1 GiB, FAT32)
 /dev/sda2  →  /boot       (1 GiB, ext4)
 /dev/sda3  →  LVM PV
@@ -446,48 +410,33 @@ Para servidores sencillos donde el cifrado no es requisito:
             └─ vg-sistema/lv-swap   →  swap   (igual a RAM hasta 4 GB; 4–8 GB para más)
 ```
 
-**Motivación del diseño:**
-
-- `/boot` separado y sin LVM: garantiza que el bootloader pueda leer el kernel sin depender de LVM/cifrado.
-- `/var`, `/var/log` y `/tmp` separados: evita que logs desbordados o `/tmp` lleno tumben el sistema.
-- LVM: permite redimensionar, añadir snapshots, y ampliar el VG si se agregan discos.
-- Opciones de montaje restrictivas en `/tmp` (`nodev,nosuid,noexec`): hardening básico gratuito.
+`/boot` va fuera de LVM para que el cargador lea el kernel sin depender de él. `/var`, `/var/log` y `/tmp` separados evitan que un log desbordado o un `/tmp` lleno tumben el sistema, y `nodev,nosuid,noexec` en `/tmp` es endurecimiento gratuito. LVM permite redimensionar, hacer snapshots y ampliar con más discos.
 
 ##### 2.2.2 Esquema con cifrado LUKS (recomendado para datos sensibles o servidores físicos)
 
-Cuando el servidor aloja datos sensibles, o su ubicación física no está plenamente controlada (oficina, colocation, laptop reutilizada como server), se añade LUKS2:
+Cuando el servidor guarda datos sensibles o su ubicación física no está controlada:
 
-```
+```text
 /dev/sda1  →  /boot/efi   (ESP, 512 MiB, FAT32, sin cifrar)
 /dev/sda2  →  /boot       (1 GiB, ext4, sin cifrar)
 /dev/sda3  →  LUKS2 → LVM PV
             └─ vg-sistema/[mismos LVs que arriba]
 ```
 
-**Puntos importantes sobre LUKS en servidores:**
-
-1. `/boot` no se cifra en el esquema estándar de Debian. GRUB 2.12 (incluido en Debian 13 Trixie) soporta LUKS2 con PBKDF2 como KDF, pero **no** con Argon2id, que es precisamente el KDF por defecto cuando el instalador de Debian 13 crea un contenedor LUKS2. Por eso si `/boot` quedara dentro del contenedor LUKS2 con Argon2id, GRUB no podría leerlo y el sistema no arrancaría. Mantener `/boot` fuera del contenedor LUKS simplifica el arranque y es un compromiso aceptable: el contenido de `/boot` no es sensible (kernels e initramfs), y el secreto real reside en los datos del volumen cifrado.
-
-2. Frase de paso vs archivo de clave: el instalador pide una frase de paso. Esta frase se solicitará en cada arranque, lo cual es problemático en servidores remotos. La solución es habilitar unlock remoto (sección 2.4).
-
-3. LUKS2 vs LUKS1: el instalador de Debian 13 usa LUKS2 por defecto (Argon2id como KDF). Esto es correcto y se mantiene.
-
-4. Swap cifrado: el swap debe ir dentro del contenedor LUKS (como un LV más del VG cifrado), nunca fuera. Si queda fuera, filtra datos de RAM.
+- `/boot` queda sin cifrar. GRUB 2.12 lee LUKS2 con PBKDF2 pero **no** con Argon2id, que es el KDF por defecto del instalador de Debian 13; con `/boot` dentro del contenedor, el sistema no arrancaría. Su contenido (kernels e initramfs) no es sensible.
+- La frase de paso se pide en cada arranque; en un servidor remoto se resuelve con 2.4.
+- LUKS2 con Argon2id, el valor por defecto, se mantiene.
+- El swap va dentro del contenedor, como un LV más. Fuera de él filtra datos de la RAM.
 
 ##### 2.2.3 En VPS
 
-El proveedor entrega un particionado simple (usualmente una sola partición `/` en el disco virtual, sin LVM ni cifrado). Modificarlo en caliente es arriesgado y rara vez justificado. Lo razonable es:
-
-- Aceptar el particionado del proveedor para el disco raíz.
-- Si se añaden volúmenes adicionales para datos (bases de datos, backups), esos sí se pueden cifrar con LUKS sin afectar el boot.
+Se acepta el particionado del proveedor, normalmente una sola `/`: modificarlo en caliente es arriesgado y rara vez se justifica. Los volúmenes de datos que se añadan sí pueden cifrarse con LUKS.
 
 ##### 2.2.4 Sistema de archivos
 
-`ext4` sigue siendo la opción por defecto y la más predecible para servidores generalistas. `btrfs` y `xfs` tienen sus usos pero introducen complejidad que no siempre se justifica en una base común. Este manual asume `ext4` salvo que un manual derivado especifique lo contrario.
+`ext4`, salvo que el manual del rol pida otro. `btrfs` y `xfs` añaden complejidad que una base común no necesita.
 
 #### 2.3 Selección de paquetes durante la instalación
-
-En la pantalla de selección de software (`tasksel`), la recomendación para un servidor base es dejar marcado solo lo estrictamente necesario:
 
 | Tarea                                | Marcar | Motivo                                                |
 |--------------------------------------|--------|-------------------------------------------------------|
@@ -497,19 +446,15 @@ En la pantalla de selección de software (`tasksel`), la recomendación para un 
 | SSH server                           | ✅ Sí  | Acceso remoto desde el primer arranque                |
 | standard system utilities            | ✅ Sí  | Herramientas básicas (`less`, `bzip2`, `wget`, etc.)  |
 
-No se marca `web server`, `print server`, ni ningún rol específico aunque se sepa que el servidor será, por ejemplo, un web server. La razón es que `tasksel` instala versiones y combinaciones de paquetes que luego complican la instalación específica (por ejemplo, Apache cuando se quería Nginx). Los roles se instalan limpios en los manuales que extienden éste.
+No se marca ningún rol aunque se conozca: `tasksel` instala combinaciones que luego estorban (Apache cuando se quería Nginx). Los roles se instalan en sus manuales.
 
-El momento de escoger el kernel -en caso de que el instalador permita esta opción- siempre utilizar el genérico `linux-image-amd64`. Es un metapaquete que siempre depende de la última versión del kernel de la serie estable en Debian 13. Las actualizaciones de seguridad del kernel llegan automáticamente vía `unattended-upgrades` (sección 14), no hay necesidad de recordar cambiar manualmente de paquete cuando salga una nueva versión del kernel, y `apt autoremove` limpia correctamente los kernels viejos (el metapaquete sabe cuál es el "actual" y preserva lo correcto).
+Si el instalador pregunta, el kernel es el metapaquete `linux-image-amd64`, que sigue siempre a la última versión estable y permite que `unattended-upgrades` (sección 16) y `apt autoremove` gestionen los kernels solos. El initrd, `genérico`, para que el sistema arranque si cambia el hipervisor o el almacenamiento.
 
-En tipo de initrd seleccionar `genérico`. Garantiza que el sistema arranque si se migra a otro hipervisor, se convierte en imagen portable, o se modifica el tipo de almacenamiento virtual. La opción `dirigido` solo se justifica en hardware fijo donde el tamaño del initrd es crítico.
-
-En VPS, esta pantalla no aparece (el sistema ya viene instalado). Se verifica en la sección 2.5 que no haya servicios innecesarios corriendo y se purgan si es necesario.
+En VPS esta pantalla no aparece; los servicios sobrantes se revisan en 2.5 y en la sección 13.4.
 
 #### 2.4 Unlock remoto de LUKS (opcional, solo si se usó cifrado)
 
-Si el servidor usa LUKS, por defecto pedirá la frase de paso en la consola física en cada arranque. Para servidores remotos esto es inviable: se configura un SSH mínimo dentro del initramfs que permite desbloquear el disco desde otra máquina.
-
-Esta configuración se hace inmediatamente después de la primera instalación, antes de cualquier reinicio programado o movimiento del servidor a su ubicación final.
+**Opcional:** solo con LUKS en un servidor sin consola accesible. Un SSH mínimo dentro del initramfs permite introducir la frase de paso desde otra máquina. Se configura justo después de instalar, antes de cualquier reinicio en remoto. Si `sudo` todavía no está instalado (sección 4), las órdenes del servidor se ejecutan desde `su -`, sin el prefijo `sudo`.
 
 ##### 2.4.1 Instalación del paquete
 
@@ -520,29 +465,35 @@ sudo apt install -y dropbear-initramfs
 
 ##### 2.4.2 Configuración de la llave pública autorizada
 
-El SSH del initramfs acepta solo autenticación por llave pública (no password). Hay que cargar la llave pública del operador que hará el unlock:
+El SSH del initramfs solo acepta llave. Se usa una llave dedicada al desbloqueo (`~/.ssh/unlock_key` en el equipo del administrador), distinta de la personal y guardada en el gestor de contraseñas. Su parte pública se copia al servidor desde ese equipo:
 
 ```bash
-sudo mkdir -p /etc/dropbear/initramfs
-sudo cp ~/.ssh/id_ed25519.pub /etc/dropbear/initramfs/authorized_keys
-sudo chmod 600 /etc/dropbear/initramfs/authorized_keys
+IP_SERVIDOR="203.0.113.10"   # IP del servidor
+MIUSUARIO=usuario
+scp ~/.ssh/unlock_key.pub "${MIUSUARIO:?}@${IP_SERVIDOR:?}:/tmp/unlock_key.pub"
 ```
 
-Ésta debe ser una llave específica para unlock remoto, no la llave personal habitual del administrador. Se genera una llave dedicada, idealmente con passphrase diferente, y se guarda en un gestor de contraseñas.
+Y en el servidor se instala como llave autorizada del initramfs:
+
+```bash
+sudo install -d -m 0755 /etc/dropbear/initramfs
+sudo install -m 0600 -o root -g root /tmp/unlock_key.pub /etc/dropbear/initramfs/authorized_keys
+rm -f /tmp/unlock_key.pub
+```
 
 ##### 2.4.3 Parámetros de red del initramfs
 
-El initramfs necesita levantar la red para que SSH escuche. En DHCP (común en VPS y redes de oficina) no hace falta configuración adicional. En IP estática, editar `/etc/initramfs-tools/initramfs.conf`:
+Con DHCP no hace falta nada. Con IP estática, en `/etc/initramfs-tools/initramfs.conf`:
 
-```
+```text
 IP=192.168.1.50::192.168.1.1:255.255.255.0:servidor::off
 ```
 
-Formato: `IP=cliente:server:gateway:netmask:hostname:interfaz:autoconf`. El campo `server` queda vacío (NFS root, no aplica).
+Formato: `IP=cliente:server:gateway:netmask:hostname:interfaz:autoconf`, con `server` vacío.
 
 ##### 2.4.4 Puerto SSH del initramfs
 
-Por defecto, dropbear escucha en el puerto 22 del initramfs. Conviene cambiarlo para que no colisione con el SSH del sistema ya arrancado (distinta sesión, misma IP, evita confusiones en `known_hosts`):
+Un puerto distinto del 22 evita confusiones en `known_hosts` entre el initramfs y el sistema arrancado:
 
 ```bash
 # Secuencia robusta: funciona tanto si la línea está comentada
@@ -566,21 +517,21 @@ grep 'DROPBEAR_OPTIONS' /etc/dropbear/initramfs/dropbear.conf
 sudo update-initramfs -u
 ```
 
-**Prueba antes de que sea crítico:** reiniciar el servidor. Desde otra máquina:
+Se prueba con un reinicio, desde otra máquina:
 
 ```bash
-ssh -p 2222 -i ~/.ssh/unlock_key root@ip.del.servidor
+ssh -p 2222 -i ~/.ssh/unlock_key root@"${IP_SERVIDOR:?}"
 # Al entrar, ejecutar dentro del initramfs:
 cryptroot-unlock
 # Introducir la frase de paso de LUKS
 # La conexión se cierra sola; el sistema continúa arrancando
 ```
 
-Si el unlock funciona, el servidor termina de arrancar y se puede acceder por SSH normal al sistema completo.
+Si el desbloqueo funciona, el servidor termina de arrancar y responde por su SSH normal.
 
 #### 2.5 Primer arranque y verificación básica
 
-Tras la instalación (o entrega del VPS), verificar que el sistema está correctamente desplegado antes de proceder al hardening.
+Antes del endurecimiento se comprueba que el sistema quedó bien desplegado.
 
 ##### 2.5.1 Identificación del sistema
 
@@ -595,7 +546,7 @@ uname -a
 cat /etc/machine-id
 ```
 
-> **VMs clonadas:** si este servidor proviene de una plantilla o clon, regenerar `machine-id`:
+> **VMs clonadas:** si el servidor viene de una plantilla, se regenera `machine-id` (más en 7.6):
 >
 > ```bash
 > sudo rm /etc/machine-id /var/lib/dbus/machine-id
@@ -604,7 +555,7 @@ cat /etc/machine-id
 > sudo reboot
 > ```
 >
-> Omitir este paso causa problemas sutiles con logs, DHCP leases duplicadas y systemd.
+> Sin ese paso aparecen problemas con logs, concesiones DHCP duplicadas y systemd.
 
 ##### 2.5.2 Revisión del arranque
 
@@ -622,24 +573,21 @@ systemctl --failed
 exit
 ```
 
-El objetivo es que `systemctl --failed` devuelva *"0 loaded units listed"* antes de continuar. Cualquier fallo a este nivel se resuelve aquí, no más adelante.
+`systemctl --failed` debe devolver *"0 loaded units listed"* antes de continuar.
 
-> En imágenes cloud (Azure, AWS y la mayoría de VPS) root no tiene contraseña y `sudo` ya viene configurado para el usuario creado en el aprovisionamiento, así que `su -` no funciona. En ese caso, sustituir `su -` por `sudo -i` aquí y en la sección 2.5.3.
+> En imágenes cloud root no tiene contraseña y `su -` no funciona; se usa `sudo -i`, aquí y en 2.5.3.
 
-> En máquinas virtuales sin dispositivo vsock (KVM sin `vhost-vsock`, Hyper-V/Azure y muchos VPS) aparece `systemd-ssh-generator: Failed to query local AF_VSOCK CID`, acompañado de `systemd-ssh-generator failed with exit status 1`. Es un bug conocido de systemd (Debian #1137216) e inofensivo, pero reaparece en cada `daemon-reload`, es decir, tras cada instalación de paquetes que recargue systemd. El resultado es un `journalctl -p err` que nunca está limpio, y un log de errores que siempre trae ruido acostumbra a ignorarlo.
->
-> Para silenciarlo sin reiniciar, enmascarar el generador desde la misma shell de root (o con `sudo` más adelante, una vez completada la sección 3):
+> En VMs sin dispositivo vsock (KVM sin `vhost-vsock`, Hyper-V/Azure y muchos VPS) aparece `systemd-ssh-generator: Failed to query local AF_VSOCK CID` con `failed with exit status 1`. Es inofensivo (Debian #1137216), pero se repite en cada `daemon-reload` y deja `journalctl -p err` siempre sucio. Se enmascara el generador desde la shell de root, o con `sudo` tras la sección 4:
 >
 > ```bash
 > mkdir -p /etc/systemd/system-generators
 > ln -s /dev/null /etc/systemd/system-generators/systemd-ssh-generator
 > systemctl daemon-reload
+> systemctl stop sshd-unix-local.socket
 > journalctl -p err --since "2 minutes ago"   # debe devolver "-- No entries --"
 > ```
 >
-> El directorio `/etc/systemd/system-generators/` no existe por defecto; sin el `mkdir` el enlace falla con "No existe el fichero o el directorio". La prueba con `daemon-reload` es la adecuada porque es precisamente lo que disparaba el error. Enmascarar el generador también desactiva el acceso SSH local por socket AF_UNIX que el generador configura, algo que un servidor administrado en remoto no usa.
->
-> La alternativa por línea de kernel (`systemd.ssh_auto=no` en `GRUB_CMDLINE_LINUX_DEFAULT`) requiere `update-grub` y un reinicio, y en imágenes cloud conviene comprobar antes que ningún archivo de `/etc/default/grub.d/` redefina esa variable.
+> El `stop` detiene el `sshd-unix-local.socket` que el generador ya creó; si sigue cargado, cada `daemon-reload` registra `Socket unit configuration has changed while unit has been running`. El SSH por red, que atiende `ssh.service`, no se ve afectado, y el acceso SSH local por socket AF_UNIX que se pierde no lo usa un servidor remoto. La alternativa por línea de kernel, `systemd.ssh_auto=no`, exige `update-grub` y reinicio.
 
 ##### 2.5.3 Estado del disco y particiones
 
@@ -670,7 +618,7 @@ fi
 exit
 ```
 
-Las comprobaciones de LVM y LUKS se basan en el tipo de dispositivo que reporta `lsblk`, no en la presencia de los comandos ni en el contenido de `/dev/mapper/`. En un VPS o una imagen cloud lo habitual es no tener ninguno de los dos (2.2.3), y en un esquema con LVM sin cifrado `/dev/mapper/` contiene volúmenes lógicos que `cryptsetup` no debe recibir. Si el esquema de la sección 2.2 usa LVM o LUKS, la salida correspondiente no puede ser "Sin volúmenes".
+Las comprobaciones usan el tipo de dispositivo que da `lsblk`. En un VPS lo normal es "Sin volúmenes"; si el esquema de 2.2 usa LVM o LUKS, no puede serlo.
 
 ##### 2.5.4 Red funcionando
 
@@ -685,49 +633,118 @@ ip route
 getent hosts deb.debian.org
 ```
 
-Los tres comandos deben funcionar. Si `getent` falla pero `ip route` muestra gateway, revisar `/etc/resolv.conf` y la configuración de `systemd-resolved` o `resolv.conf` estático.
+Si `getent` falla pero hay gateway, se revisa `/etc/resolv.conf` o `systemd-resolved`.
 
 ##### 2.5.5 Acceso SSH funcional (desde otra máquina)
 
-Desde el equipo del administrador:
-
 ```bash
-ssh usuario@ip.del.servidor
+IP_SERVIDOR="203.0.113.10"   # IP del servidor
+MIUSUARIO=usuario
+ssh "${MIUSUARIO:?}@${IP_SERVIDOR:?}"
 ```
 
-Este acceso en este momento es con la configuración por defecto del instalador (puerto 22, password auth posiblemente habilitado). El hardening de SSH se hace en la sección 8, pero la verificación de que el canal funciona se hace aquí.
-
-#### Notas sobre el enfoque generalista
-
-**Lo que esta sección deliberadamente no incluye:**
-
-- Configuración de IP estática definitiva: se hace en sección 4 (identidad) o varía demasiado según proveedor de nube.
-- Instalación de QEMU guest agent / open-vm-tools / cloud-init: pertenece a un anexo específico por plataforma. La excepción es la regla `sudo` sin contraseña que cloud-init deja en los VPS, que por ser un asunto de seguridad se neutraliza en la sección 7.3.4.
-- Firmware no-free adicional (microcódigo Intel/AMD): se gestiona con los repositorios en sección 5, no durante la instalación base.
-
-**Lo que los manuales específicos (mail, web, Apache, WordPress, etc.) deben añadir sobre esta base:**
-
-- Ajustes de particionado si el rol lo requiere (ej. `/var/lib/mysql` en LV separado para DB server).
-- Recursos mínimos específicos del rol.
-- Consideraciones de red adicionales (múltiples IPs, interfaces dedicadas, etc.).
-
----
+Todavía con la configuración del instalador (puerto 22, quizá con contraseña). Se endurece en la sección 10.
 
 ## Etapa II — Configuración base del sistema
 
-Esta parte lleva al sistema recién instalado desde un estado "arranca y es accesible" a un estado "utilizable como servidor administrable de forma estándar". Cubre la instalación de herramientas administrativas básicas, el acceso remoto, la identidad del sistema, los repositorios y usuarios.
-
-El hardening propiamente dicho (SSH endurecido, firewall, fail2ban, sysctl, etc.) corresponde a la Etapa III. Aquí solo se prepara el terreno.
+Lleva el sistema de "arranca y es accesible" a "servidor administrable de forma estándar": herramientas, acceso remoto, identidad, repositorios y usuarios. El endurecimiento es la Etapa III.
 
 ---
 
-### 3. Preparación mínima para administración
+### 3. Plantillas y variables del manual
 
-Debian instalado desde ISO `netinst` con contraseña de root definida no incluye `sudo` por defecto. Es una decisión deliberada de Debian: si hay cuenta de root activa, asume administración con `su -`. Sin embargo, todo el resto del manual asume `sudo` disponible como herramienta estándar, por lo que esta sección lo instala y habilita antes de cualquier otra tarea.
+Las configuraciones largas viven como plantillas en <https://github.com/noggalito/debian/tree/main/assets/13>, se descargan con `wget` y se completan con `sed`. Esta sección reúne cómo se usan, cuáles son y qué variables piden.
 
-En VPS de nube y plantillas corporativas, lo normal es que `sudo` ya venga instalado y con el usuario administrativo añadido al grupo correspondiente. En ese caso, esta sección se verifica en pocos segundos.
+#### 3.1 Convenciones del sistema de plantillas
 
-#### 3.1 Diagnóstico de instalación de `sudo`
+El nombre de cada plantilla es su ruta de destino con guiones en lugar de barras: `plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt` va a `/etc/ssh/sshd_config.d/01-hardening.conf`. Las variables llevan el prefijo `$` y se sustituyen antes de copiar:
+
+```bash
+# Patrón general
+export PLANTILLA=plantilla-etc-ejemplo.conf.txt   # nombre en assets/13/
+export DESTINO=/etc/ejemplo.conf                  # ruta de destino
+export MIVARIABLE=valor
+
+: "${ASSETS_BASE:?}" "${PLANTILLA:?}" "${DESTINO:?}" "${MIVARIABLE:?}" && \
+wget "${ASSETS_BASE}/${PLANTILLA}" -O "/tmp/${PLANTILLA}" && \
+sed -e "s|\$MIVARIABLE|${MIVARIABLE}|g" "/tmp/${PLANTILLA}" \
+    | sudo install -m 0644 -o root -g root /dev/stdin "${DESTINO}"
+
+# Comprobar que no quedó ningún marcador sin sustituir
+sudo grep -n '\$MI[A-Z_]*' "${DESTINO}" || echo "✓ plantilla aplicada"
+```
+
+Guarda, descarga y despliegue van en una sola orden encadenada con `&&`, porque hay tres formas de dejar un archivo de sistema vacío sin ningún error visible:
+
+- En una shell interactiva, un `${VAR:?}` en una línea aparte solo aborta esa línea; el resto del bloque pegado se ejecuta con la variable vacía.
+- Si la guarda está dentro del `sed` de una tubería, el último eslabón (`install` o `tee`) se ejecuta igual y deja el destino con 0 bytes y código 0.
+- `wget -O` crea el archivo aunque la descarga falle, y un `sed` o `cp` posterior lo instalaría.
+
+El último eslabón es `install` con los permisos que corresponden al destino, para no depender de la `UMASK` (9.4); las plantillas sin variables lo usan con el archivo descargado como origen. Un heredoc sin comillas (`<<EOF`) es seguro por sí solo: si la expansión falla, `tee` no llega a ejecutarse. La comprobación final detecta marcadores `$MI` que el `sed` no contempla. El repositorio fuerza saltos de línea LF con `.gitattributes`.
+
+##### 3.1.1 Modelo de seguridad: anclaje a commit SHA
+
+La punta de una rama es mutable: si el repositorio se comprometiera, las instalaciones futuras recibirían otro contenido. Por eso las descargas se anclan a un commit (`SHA_COMMIT`). Se define una vez, antes de la primera plantilla:
+
+```bash
+# Obtener el SHA del commit que se desea anclar.
+# Opción A — si se tiene git instalado localmente:
+#   git ls-remote https://github.com/noggalito/debian/ HEAD | awk '{print $1}'
+# Opción B — consultar la página de commits en GitHub y copiar el SHA completo (40 caracteres)
+#   https://github.com/noggalito/debian/commits/main
+
+export SHA_COMMIT="<REEMPLAZAR-POR-SHA-DE-40-CARACTERES>"
+export ASSETS_BASE="https://raw.githubusercontent.com/noggalito/debian/${SHA_COMMIT}/assets/13"
+
+# Verificar que la variable quedó definida
+echo "SHA_COMMIT = ${SHA_COMMIT}"
+echo "ASSETS_BASE = ${ASSETS_BASE}"
+```
+
+#### 3.2 Inventario de plantillas
+
+| Plantilla                                               | Versión | Sección | Ruta destino                               | Variables                                                                              |
+|---------------------------------------------------------|---------|---------|--------------------------------------------|----------------------------------------------------------------------------------------|
+| `plantilla-etc-hosts.txt`                               | v1.1    | 7.2     | `/etc/hosts`                               | `$MIHOST`, `$MIFQDN`                                                                   |
+| `plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt` | v1.3    | 10.1    | `/etc/ssh/sshd_config.d/01-hardening.conf` | `$MIPUERTO`, `$MIUSUARIO`                                                              |
+| `plantilla-etc-fail2ban-jail.local.txt`                 | v1.0    | 12.2    | `/etc/fail2ban/jail.local`                 | `$MIPUERTO`                                                                            |
+| `plantilla-etc-sysctl.d-99-hardening.conf.txt`          | v1.2    | 13.1    | `/etc/sysctl.d/99-hardening.conf`          | (sin variables)                                                                        |
+| `plantilla-etc-modprobe.d-99-hardening.conf.txt`        | v1.1    | 13.2    | `/etc/modprobe.d/99-hardening.conf`        | (sin variables)                                                                        |
+| `plantilla-etc-audit-rules.d-99-hardening.rules.txt`    | v1.1    | 14.1    | `/etc/audit/rules.d/99-hardening.rules`    | (sin variables)                                                                        |
+| `plantilla-etc-cron.hourly-server-check.txt`            | v1.1    | 19.2    | `/etc/cron.hourly/server-check`            | (sin variables)                                                                        |
+| `plantilla-etc-msmtprc.txt`                             | v1.2    | 21.4    | `/etc/msmtprc`                             | `$MIRELAY`, `$MIPUERTO_SMTP`, `$MIUSUARIO_SMTP`, `$MIFROM`                             |
+
+#### 3.3 Resumen de variables del manual
+
+| Variable          | Significado                                                       | Ejemplo                                       |
+|-------------------|-------------------------------------------------------------------|-----------------------------------------------|
+| `$MIHOST`         | Hostname corto del servidor                                       | `villonaco`                                   |
+| `$MIFQDN`         | Nombre completo / FQDN del servidor                               | `villonaco.ejemplo.com`                       |
+| `$MIUSUARIO`      | Usuario administrativo                                            | `usuario`                                     |
+| `$MIPUERTO`       | Puerto SSH personalizado (también usado por fail2ban)             | `17177`                                       |
+| `$MIRELAY`        | Hostname del relay SMTP saliente                                  | `smtp.gmail.com`                              |
+| `$MIPUERTO_SMTP`  | Puerto SMTP del relay (sección 21 — distinto de `$MIPUERTO`)      | `587`                                         |
+| `$MIUSUARIO_SMTP` | Usuario para autenticarse contra el relay                         | `cuenta@dominio.com`                          |
+| `$MIFROM`         | Dirección "From" autorizada en el relay                           | `cuenta@dominio.com`                          |
+| `$MIDESTINO`      | Dirección externa donde llega el correo del sistema               | `admin@dominio.com`                           |
+| `$MIZONA`         | Zona horaria del servidor (7.3)                                   | `America/Lima`                                |
+| `$MIIFAZ`         | Interfaz de la ruta por defecto (7.5.2)                           | `enp1s0`                                      |
+| `$IP_SERVIDOR`    | IP del servidor, en el equipo del administrador (2.5.5, 10.2)     | `203.0.113.10`                                |
+| `$MINOMBREDELLAVE`| Nombre de la llave SSH del administrador (6.2)                    | `id_ed25519`                                  |
+| `$SHA_COMMIT`     | SHA del commit del repositorio de plantillas anclado              | `a1b2c3d4...` (40 chars)                      |
+| `$ASSETS_BASE`    | URL base para descarga de plantillas (derivada de `SHA_COMMIT`)   | `https://raw.githubusercontent.com/.../assets`|
+
+Los valores usados en cada servidor se anotan en su inventario (22.1).
+
+#### 3.4 Modificación local de plantillas
+
+Si hace falta un cambio que ninguna variable cubre, hay dos caminos. Un fork del repositorio, cuando el cambio es sostenido y vale para varios servidores; la descarga apunta entonces al fork. O editar el destino tras desplegarlo, cuando el cambio es de un solo servidor, anotándolo en el runbook (22.3). Las plantillas del repositorio original no se tocan sin coordinación, porque las usan todos los despliegues.
+
+### 4. Preparación mínima para administración
+
+Una instalación `netinst` con contraseña de root no trae `sudo`: Debian asume administración con `su -`. El manual entero usa `sudo`, así que se instala primero. En VPS y plantillas suele venir ya, y la sección se reduce a verificarlo.
+
+#### 4.1 Diagnóstico de instalación de `sudo`
 
 Desde la sesión del usuario administrativo:
 
@@ -735,29 +752,24 @@ Desde la sesión del usuario administrativo:
 sudo -V 2>/dev/null | head -1
 ```
 
-Tres posibles resultados:
-
 | Resultado                                           | Estado                 | Acción              |
 |-----------------------------------------------------|------------------------|---------------------|
-| `Sudo version 1.9.x ...`                            | Instalado y funcional  | Saltar a 3.3        |
-| `-bash: sudo: orden no encontrada`                  | No instalado           | Continuar con 3.2   |
-| Instalado pero `usuario is not in the sudoers file` | Instalado sin permisos | Ir a 3.2.2          |
+| `Sudo version 1.9.x ...`                            | Instalado y funcional  | Saltar a 4.3        |
+| `-bash: sudo: orden no encontrada`                  | No instalado           | Continuar con 4.2   |
+| Instalado pero `usuario is not in the sudoers file` | Instalado sin permisos | Ir a 4.2.2          |
+| Instalado, pero el acceso es solo como root         | Sin usuario propio     | Ir a 4.2.4          |
 
-#### 3.2 Instalación de `sudo`
+#### 4.2 Instalación de `sudo`
 
-##### 3.2.1 Elevar privilegios temporalmente
-
-Como `sudo` no existe, se usa `su -` para obtener una shell de root:
+##### 4.2.1 Elevar privilegios temporalmente
 
 ```bash
 su -
 ```
 
-Introducir la contraseña de root. El prompt cambiará a `root@<hostname>:~#`.
+`su -` con guion carga el entorno completo de root; sin guion conserva parte del entorno del usuario y puede dar sorpresas.
 
-> Nota: `su -` con guion carga el entorno completo de root (`PATH`, `HOME`, etc.). `su` sin guion conserva parte del entorno del usuario invocador y puede causar comportamientos inesperados. Para tareas administrativas siempre se usa con guion.
-
-##### 3.2.2 Instalar el paquete y añadir el usuario al grupo `sudo`
+##### 4.2.2 Instalar el paquete y añadir el usuario al grupo `sudo`
 
 ```bash
 export MIUSUARIO=usuario
@@ -766,30 +778,48 @@ apt install -y sudo
 usermod -aG sudo "${MIUSUARIO:?}"
 ```
 
-En Debian, pertenecer al grupo `sudo` es suficiente para obtener permisos completos, porque `/etc/sudoers` incluye por defecto:
+En Debian, el grupo `sudo` da permisos completos porque `/etc/sudoers` incluye:
 
-```
+```text
 %sudo   ALL=(ALL:ALL) ALL
 ```
 
-No se edita `/etc/sudoers` en este momento. El endurecimiento de la configuración de `sudo` (políticas, `pwfeedback`, timeouts, archivos en `/etc/sudoers.d/`) se cubre en la sección 7.
+`/etc/sudoers` no se edita; el endurecimiento de `sudo` es la sección 9.3.
 
-##### 3.2.3 Salir de la shell de root
+##### 4.2.3 Salir de la shell de root
 
 ```bash
 exit
 ```
 
-#### 3.3 Activación de la pertenencia al grupo
+##### 4.2.4 Crear el usuario administrativo (VPS que solo entregan root)
 
-La pertenencia a un nuevo grupo no se activa en sesiones ya abiertas. Hay que cerrar y reabrir la sesión completa:
+Algunos proveedores entregan el VPS solo con root y contraseña. Ahí `sudo` ya está y 4.1 parece correcto, pero solo porque lo ejecuta root, que no necesita el grupo. El manual asume la cuenta propia desde la sección 6, así que se crea desde la sesión de root:
+
+```bash
+export MIUSUARIO=usuario
+adduser "${MIUSUARIO:?}"
+usermod -aG sudo "${MIUSUARIO:?}"
+```
+
+`adduser` pide una contraseña y hay que darla, aunque el acceso vaya a ser por llave: es la que `sudo` pedirá tras la sección 9.3. Se revisa quién más está en el grupo:
+
+```bash
+getent group sudo
+```
+
+Las cuentas que haya creado la imagen se tratan en la sección 5. La sesión de root queda abierta como canal de rescate hasta que pase la verificación de 4.3, que se hace desde una conexión SSH nueva con el usuario recién creado.
+
+#### 4.3 Activación de la pertenencia al grupo
+
+Los grupos nuevos no se aplican a sesiones abiertas; hay que reconectar:
 
 ```bash
 exit
 # Reconectar por SSH o consola
 ```
 
-Tras reconectar, verificar:
+Tras reconectar:
 
 ```bash
 id
@@ -799,39 +829,121 @@ sudo -v
 # Pide la contraseña del usuario (no la de root). Si no devuelve error, sudo está operativo.
 ```
 
+La verificación solo vale con la cuenta del usuario administrativo. Como root, `id` da `uid=0(root)` y `sudo -v` pasa sin pedir nada, sin comprobar nada.
+
 ---
 
-### 4. Acceso remoto inicial
+### 5. Revisión del aprovisionamiento del proveedor
 
-Esta sección asegura que el servidor es accesible por SSH con llave pública desde el equipo del administrador, usando todavía la configuración por defecto del instalador (puerto 22, password auth habilitado). El endurecimiento de SSH se hace en la Etapa III.
+Un VPS arranca desde una imagen que el proveedor personaliza en el primer arranque, casi siempre con cloud-init: crea cuentas, asigna contraseñas, cambia SSH, instala paquetes y deja archivos en `/etc`. Nada de eso se ve en el panel, y parte contradice la Etapa III. Esta revisión se hace tras 2.5 y antes de la Etapa III. Lo encontrado en cada proveedor está en [`proveedores/`](proveedores/).
 
-En VPS y VMs donde ya estás conectado por SSH (como seguramente es el caso), esta sección se reduce a formalizar el acceso por llave pública antes de desactivar el password auth en hardening.
+#### 5.1 Revisión tras el primer arranque
 
-#### 4.1 Verificación del servidor SSH
+```bash
+sudo cloud-init status --long
+sudo cat /var/lib/cloud/instance/user-data.txt
+```
+
+> **ATENCIÓN:** el user-data puede contener contraseñas en texto claro (`chpasswd`, `password`). No se copia a tickets, chats ni documentación sin borrarlas. Si las contiene, se consideran expuestas y se cambian ahora, porque suelen seguir disponibles en el medio de arranque del proveedor.
+
+Se revisan las cuentas con privilegios, las reglas de sudo heredadas, la configuración efectiva de SSH y los archivos que escribió la imagen (`write_files`):
+
+```bash
+getent group sudo
+sudo ls -la /etc/sudoers.d/ /etc/ssh/sshd_config.d/
+sudo sshd -T | grep -Ei '^(permitrootlogin|passwordauthentication|kbdinteractiveauthentication)'
+sudo grep -E '^\s+path:' /var/lib/cloud/instance/user-data.txt
+```
+
+El grupo `sudo` debe contener solo al usuario administrativo; una cuenta del proveedor que no se use se elimina con su regla de `/etc/sudoers.d/` (5.2). Si `sshd -T` muestra `passwordauthentication yes` o `permitrootlogin yes`, el servidor acepta contraseñas desde internet y conviene adelantar la sección 10. Se revisan también los agentes de terceros que traiga la imagen, como el antimalware de Hostinger; mantenerlos es una decisión expresa.
+
+Una vez completado el primer arranque, cloud-init no aporta nada a un servidor administrado a mano. Se desactiva si la red vive en `/etc` y no se genera en cada arranque, como ocurre con un `/etc/netplan/50-cloud-init.yaml` completo:
+
+```bash
+sudo touch /etc/cloud/cloud-init.disabled
+```
+
+Tras el siguiente reinicio, `cloud-init status` debe dar `status: disabled` y la red debe seguir igual (2.5.4).
+
+#### 5.2 Reglas heredadas del aprovisionamiento (VPS con cloud-init)
+
+Las imágenes cloud suelen dejar `/etc/sudoers.d/90-cloud-init-users` con una regla `NOPASSWD`. Importa a quién beneficia:
+
+```text
+# User rules for <usuario>
+<usuario> ALL=(ALL) NOPASSWD:ALL
+```
+
+Si beneficia al usuario administrativo, es grave. Las reglas se suman y, como `@includedir` va al final de `/etc/sudoers`, es la que sudo aplica: ningún comando pide contraseña, quien tenga la llave SSH obtiene root, y ni `pam_faillock` (9.3.3) ni `mail_badpass` (9.3.1) actúan nunca. Si beneficia a root, no tiene efecto práctico, pero se retira igual: lynis y las guías CIS la marcan.
+
+Detección, desde la sesión del usuario administrativo:
+
+```bash
+ls -l /etc/sudoers.d/
+sudo grep -rn NOPASSWD /etc/sudoers /etc/sudoers.d/
+sudo -k
+sudo true                      # si no pide contraseña, NOPASSWD está activo
+sudo -l | grep -i nopasswd     # muestra "(ALL) NOPASSWD: ALL" si está activo
+```
+
+> **ATENCIÓN:** como root, `sudo -l` devuelve siempre `(ALL) NOPASSWD: ALL`, exista o no el archivo. Y `sudo -v` tampoco sirve: con `verifypw=all` pide contraseña si alguna regla la exige, y `%sudo` la exige.
+
+Antes de retirarla, el usuario debe tener contraseña o se quedará sin sudo:
+
+```bash
+sudo passwd -S "${MIUSUARIO:?}"
+```
+
+La segunda columna debe ser `P` (`usuario P 2026-09-26 1 90 14 -1`). Con `L` o `NP`, primero `sudo passwd "${MIUSUARIO:?}"`, y se confirma el grupo (9.1). Se lee el archivo completo, porque puede tener más de una regla:
+
+```bash
+sudo cat /etc/sudoers.d/90-cloud-init-users
+```
+
+Con una segunda sesión SSH abierta (6.4):
+
+```bash
+sudo rm /etc/sudoers.d/90-cloud-init-users
+sudo visudo -c
+sudo -k
+sudo true      # ahora debe pedir contraseña
+```
+
+`visudo -c` va siempre después de tocar `/etc/sudoers.d/`: un error de sintaxis inhabilita sudo por completo y solo se repara por consola. La sesión de respaldo se cierra cuando `sudo true` pide la contraseña y la acepta.
+
+El archivo no reaparece en reinicios normales, porque el módulo de usuarios de cloud-init corre una vez por instancia; sí al redesplegar o capturar la imagen. AIDE (14.3) lo detectaría en `/etc`. Desactivar cloud-init (5.1) elimina el riesgo.
+
+Sin `NOPASSWD` se activan dos mecanismos dormidos. `pam_faillock` pasa a aplicarse a sudo: con `silent`, un bloqueo parece una contraseña incorrecta y dura `unlock_time` (10 minutos), sin afectar al acceso SSH por llave. Y la contraseña del usuario, que vence a los 90 días según 9.4, se convierte en la llave de sudo; conviene anotar su vencimiento con `sudo chage -l "${MIUSUARIO:?}"`.
+
+### 6. Acceso remoto inicial
+
+Deja el acceso por llave pública funcionando, todavía con la configuración por defecto de SSH. En un VPS donde ya hay conexión, se reduce a formalizar la llave antes de desactivar las contraseñas en la sección 10.
+
+#### 6.1 Verificación del servidor SSH
 
 ```bash
 sudo systemctl status ssh --no-pager
 ```
 
-El servicio debe aparecer como `active (running)`. Si no está instalado (instalación manual sin marcar la tarea "SSH server"):
+Debe estar `active (running)`. Si no se instaló:
 
 ```bash
 sudo apt install -y openssh-server
 sudo systemctl enable --now ssh
 ```
 
-#### 4.2 Copia de la llave pública del administrador
+#### 6.2 Copia de la llave pública del administrador
 
-Se requiere contar con una llave SSH Ed25519, en caso de no tenerla se puede acceder al manual [aquí](https://github.com/noggalito/llave-ssh). La variable `$MINOMBREDELLAVE` se define en el manual citado en la línea anterior; en caso de no seguir ese manual, se la debe definir ahora antes de seguir. Desde el equipo del administrador (no desde el servidor), copiar la llave pública al servidor:
+Hace falta una llave Ed25519 ([manual](https://github.com/noggalito/llave-ssh)); `$MINOMBREDELLAVE` se define ahí o aquí. Desde el equipo del administrador, con las variables de 2.5.5:
 
 ```bash
-ssh-copy-id -i ~/.ssh/${MINOMBREDELLAVE}.pub usuario@servidor
+ssh-copy-id -i ~/.ssh/"${MINOMBREDELLAVE:?}".pub "${MIUSUARIO:?}@${IP_SERVIDOR:?}"
 ```
 
-En caso que no haya `ssh-copy-id`, aunque es menos recomendado se puede usar:
+Sin `ssh-copy-id`:
 
 ```bash
-cat ~/.ssh/${MINOMBREDELLAVE}.pub | ssh usuario@servidor '
+cat ~/.ssh/"${MINOMBREDELLAVE:?}".pub | ssh "${MIUSUARIO:?}@${IP_SERVIDOR:?}" '
   umask 077 &&
   mkdir -p ~/.ssh &&
   cat >> ~/.ssh/authorized_keys &&
@@ -840,21 +952,15 @@ cat ~/.ssh/${MINOMBREDELLAVE}.pub | ssh usuario@servidor '
 '
 ```
 
-O manualmente, añadiendo el contenido de `${MINOMBREDELLAVE}.pub` a `~/.ssh/authorized_keys` del servidor.
+O añadiendo a mano `${MINOMBREDELLAVE}.pub` a `~/.ssh/authorized_keys` del servidor.
 
-Ed25519 es la opción recomendada para llaves nuevas: es más corta, más rápida y criptográficamente sólida. RSA de 4096 bits sigue siendo aceptable pero sin ventajas prácticas.
-
-#### 4.3 Verificación del acceso por llave
-
-Desde el equipo del administrador:
+#### 6.3 Verificación del acceso por llave
 
 ```bash
-ssh <usuario>@<ip.del.servidor>
+ssh "${MIUSUARIO:?}@${IP_SERVIDOR:?}"
 ```
 
-Debe entrar sin pedir contraseña. Si pide contraseña, la llave no se copió correctamente o los permisos de `~/.ssh` en el servidor están mal.
-
-Comprobación de permisos en el servidor:
+Debe entrar sin contraseña. Si la pide, la llave no se copió o los permisos están mal:
 
 ```bash
 ls -ld ~/.ssh
@@ -863,16 +969,14 @@ ls -l ~/.ssh/authorized_keys
 
 Permisos esperados:
 
-```
+```text
 drwx------  .ssh
 -rw-------  authorized_keys
 ```
 
-#### 4.4 Mantener el canal de rescate abierto
+#### 6.4 Mantener el canal de rescate abierto
 
-Durante el resto del manual, no cerrar la sesión SSH que funciona. Abrir una segunda sesión en paralelo para probar cambios. Si algo rompe la configuración SSH, la sesión original sigue conectada y permite reparar.
-
-Una opción es usar SSH con sesión persistente a través de `tmux`. En caso de un cierre no deseado de sesión SSH, basta con reconectar a través de `tmux` para continuar desde el punto de la desconexión
+Durante el resto del manual, la sesión que funciona no se cierra y los cambios se prueban desde una segunda. Si algo rompe SSH, la primera permite repararlo. `tmux` además sobrevive a un corte:
 
 ```bash
 # Instalación de tmux en el servidor
@@ -883,39 +987,34 @@ sudo apt install -y tmux
 tmux new -A -s admin
 ```
 
-En caso de cierre de sesión de SSH, se debe volver a reconectar SSH y luego ejecutar:
+Tras un corte, se reconecta por SSH y se vuelve a la sesión:
 
 ```bash
 tmux attach -t admin
 ```
 
-Finalmente, para cerrar la sesión `tmux` y regresar a la sesión SSH original: `Ctrl+b` luego `d`
+Para salir de `tmux` sin cerrarlo: `Ctrl+b` y luego `d`.
 
-Este hábito se consolida en la Etapa III cuando se cambia el puerto SSH, se deshabilita password auth, y se activa el firewall.
+### 7. Configuración regional y de identidad
 
-### 5. Configuración regional y de identidad
-
-Esta sección fija la identidad del servidor: hostname, zona horaria, locales, y red básica.
-
-#### 5.1 Hostname
-
-El hostname puede haberse definido durante la instalación. Verificar:
+#### 7.1 Hostname
 
 ```bash
 sudo hostnamectl
 ```
 
-Para cambiarlo (o fijarlo si no se definió):
+Para fijarlo:
 
 ```bash
-sudo hostnamectl set-hostname <hostname>
+export MIHOST=villonaco
+sudo hostnamectl set-hostname "${MIHOST:?}"
 ```
 
-`hostnamectl` actualiza `/etc/hostname` y lo aplica en caliente. No requiere reinicio.
+`hostnamectl` actualiza `/etc/hostname` en caliente, sin reiniciar.
 
-#### 5.2 Archivo `/etc/hosts`
+#### 7.2 Archivo `/etc/hosts`
 
-El archivo `/etc/hosts` debe reflejar el hostname para que resoluciones locales no pasen por DNS. Edición recomendada:
+El hostname debe resolverse localmente, sin pasar por DNS:
 
 ```bash
 # Respaldar el archivo original
@@ -925,93 +1024,70 @@ sudo cp /etc/hosts /etc/hosts.ori
 export MIHOST=villonaco
 export MIFQDN=villonaco.ejemplo.com
 
-# Descargar y aplicar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar y aplicar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §3.1.1)
 : "${ASSETS_BASE:?}" "${MIHOST:?}" "${MIFQDN:?}" && \
 wget "${ASSETS_BASE}/plantilla-etc-hosts.txt" -O /tmp/plantilla-etc-hosts.txt && \
 sed -e "s|\$MIFQDN|${MIFQDN}|g" -e "s|\$MIHOST|${MIHOST}|g" \
-    /tmp/plantilla-etc-hosts.txt | sudo tee /etc/hosts > /dev/null
+    /tmp/plantilla-etc-hosts.txt | sudo install -m 0644 -o root -g root /dev/stdin /etc/hosts
 
 # Comprobar que no quedó ningún marcador sin sustituir
 grep -n '\$MI[A-Z_]*' /etc/hosts || echo "✓ plantilla aplicada"
 ```
 
-Es probable que la terminal arroje un error como: `sudo: unable to resolve host villonaco: Nombre o servicio desconocido`, sin embargo se debe omitir ese mensaje y avanzar.
-
-Si el servidor no pertenece a ningún dominio, usar `<hostname>.lan` o simplemente omitir la parte FQDN y dejar `127.0.1.1 <hostname>`.
-
-Verificación:
+El aviso `sudo: unable to resolve host villonaco` que puede salir durante el cambio se ignora. Sin dominio, se usa `<hostname>.lan` o solo `127.0.1.1 <hostname>`.
 
 ```bash
 hostname -f     # FQDN completo
 hostname -s     # nombre corto
-getent hosts <hostname>
+getent hosts "${MIHOST:?}"
 ```
 
-#### 5.3 Zona horaria
+#### 7.3 Zona horaria
 
 ```bash
-timedatectl                              # estado actual
-timedatectl list-timezones | grep <Region>   # buscar zona, por ejemplo America
-sudo timedatectl set-timezone <Region/Ciudad>  # por ejemplo America/Lima
+export MIZONA=America/Lima                         # zona del servidor
+timedatectl                                        # estado actual
+timedatectl list-timezones | grep "^${MIZONA%%/*}/"   # zonas de la misma región
+sudo timedatectl set-timezone "${MIZONA:?}"
 ```
-
-Ejemplo para operaciones en Perú:
-
-```bash
-sudo timedatectl set-timezone America/Lima
-```
-
-Verificación:
 
 ```bash
 date
 ```
 
-La sincronización NTP se configura en la Etapa IV (mantenimiento). En este punto basta con la zona horaria correcta.
+La sincronización horaria es la sección 17.
 
-#### 5.4 Locales
+#### 7.4 Locales
 
-Los locales definen idioma, formato de fecha, separador decimal, orden alfabético, etc. La mayoría de servidores se benefician de mantener `C.UTF-8` o `en_US.UTF-8` como locale por defecto (logs en inglés, menos sorpresas al buscar errores en documentación), y añadir el locale regional como opción.
+En un servidor conviene `C.UTF-8` o `en_US.UTF-8` por defecto, con logs en inglés que se buscan fácil, y el locale regional como adicional.
 
 ```bash
 sudo apt install -y locales
 sudo dpkg-reconfigure locales
 ```
 
-En el diálogo:
-
-1. Marcar los locales a generar. Recomendación: `en_US.UTF-8 UTF-8` y el locale regional, por ejemplo `es_PE.UTF-8 UTF-8`.
-2. Seleccionar el locale por defecto del sistema.
-
-Para un servidor, una recomendación práctica:
-
-- Locale por defecto: `en_US.UTF-8` o `C.UTF-8` (mantiene los logs en inglés).
-- Locales adicionales generados: los que el operador necesite para tareas puntuales.
-
-Alternativamente, para dejar todo en idioma regional:
+En el diálogo se marcan `en_US.UTF-8 UTF-8` y el regional (por ejemplo `es_PE.UTF-8 UTF-8`), y se elige el de defecto. Para dejarlo todo en el idioma regional:
 
 ```bash
-sudo update-locale LANG=es_PE.UTF-8 LC_ALL=es_PE.UTF-8
+sudo update-locale --reset LANG=es_PE.UTF-8
 ```
 
-Verificación:
+Basta con `LANG`. `LC_ALL` no se define en `/etc/default/locale`: tiene prioridad sobre todo e impide cambiar una categoría puntual, como `LC_MESSAGES=C` para buscar un error en inglés. `--reset` borra además un `LC_ALL` heredado.
 
 ```bash
 locale
 locale -a | grep -E 'es_PE|en_US'
 ```
 
-El cambio de locale requiere cerrar y reabrir la sesión para que las variables se apliquen.
+El cambio se aplica al reabrir la sesión.
 
-#### 5.5 Red
+#### 7.5 Red
 
-La instalación netinst de Debian 13 Trixie configura la red durante el instalador y la deja gestionada por `ifupdown` en `/etc/network/interfaces`, sin instalar `dhcpcd` ni `NetworkManager` ni `systemd-networkd`. Este es el punto de partida tanto en bare metal como en VMs locales. En VPS la situación varía: la mayoría de proveedores entrega el sistema con `ifupdown` y configuración estática inyectada en `/etc/network/interfaces`, pero algunos (especialmente los que usan imágenes cloud-init) llegan con `systemd-networkd` o `netplan` ya activos. El primer paso del manual es verificar qué backend está realmente en uso antes de decidir el camino.
+La netinst deja la red en `ifupdown` (`/etc/network/interfaces`), sin `dhcpcd`, `NetworkManager` ni `systemd-networkd`. En VPS varía: muchos usan `ifupdown` con configuración estática y las imágenes con cloud-init suelen traer `systemd-networkd` o netplan. El objetivo es siempre una IP estable, gateway, DNS y persistencia. Si la red ya funciona como debe, de esta sección solo aplican 7.5.1, 7.5.2, 7.5.7 y 7.5.8; las opciones A, B y C son **opcionales**.
 
-Sea cual sea el backend, para un servidor el objetivo es el mismo: una IP estable, un gateway por defecto, DNS funcional, y configuración persistente entre reinicios. Esta sección documenta dos caminos: mantener `ifupdown` (la opción más conservadora y la que coincide con la configuración por defecto de la netinst), o migrar a `systemd-networkd` (recomendado solo si el servidor va a tener configuraciones de red complejas o se prefiere coherencia con el resto del ecosistema systemd).
+Con netplan (`/etc/netplan/*.yaml`, habitual en imágenes con cloud-init), las opciones A, B y C no aplican: la configuración se cambia en ese archivo y se aplica con `sudo netplan try`, que la revierte si no se confirma a tiempo. Este caso está pendiente de validación.
 
-##### 5.5.1 Estado actual de la red
-
-Antes de modificar nada, verificar qué backend gestiona la red y qué configuración tiene ahora mismo:
+##### 7.5.1 Estado actual de la red
 
 ```bash
 # Estado de IPs y rutas
@@ -1029,17 +1105,15 @@ dpkg -l | grep -E '^ii  (ifupdown|systemd-networkd|netplan|network-manager|dhcpc
 systemctl is-active networking systemd-networkd NetworkManager 2>/dev/null
 ```
 
-Interpretación de la salida:
+- `networking` activo con `ifupdown`: configuración en `/etc/network/interfaces`, el caso de la netinst.
+- `systemd-networkd` activo: configuración en `/etc/systemd/network/*.network`, típico en imágenes cloud.
+- `NetworkManager` activo: raro en servidor.
 
-- `networking` activo y `ifupdown` instalado: backend es `ifupdown` (configuración en `/etc/network/interfaces`). Es el caso por defecto en netinst.
-- `systemd-networkd` activo: backend es `systemd-networkd` (configuración en `/etc/systemd/network/*.network`). Típico en algunas imágenes cloud y VPS modernos.
-- `NetworkManager` activo: backend es `NetworkManager` (configuración con `nmcli` o en `/etc/NetworkManager/system-connections/`). Típico en instalaciones con escritorio, raro en server.
+Con IP del rango esperado, gateway y `getent hosts` resolviendo, solo queda decidir si la IP se fija.
 
-Si la interfaz aparece con IP del rango esperado, `ip route` muestra gateway por defecto, y `getent hosts` resuelve, la red está funcional y solo queda decidir si hacer la IP estática o mantener DHCP.
+##### 7.5.2 Identificar el nombre de la interfaz
 
-##### 5.5.2 Identificar el nombre de la interfaz
-
-Debian 13 usa nombres predecibles de interfaz (`enp1s0`, `eno1`, `ens3`, etc.) en lugar de los antiguos `eth0`. Para identificar la interfaz que tiene la IP del servidor:
+Debian 13 usa nombres predecibles (`enp1s0`, `eno1`, `ens3`):
 
 ```bash
 ip -brief address | grep -v '^lo'
@@ -1047,63 +1121,54 @@ ip -brief address | grep -v '^lo'
 
 Salida típica:
 
-```
+```text
 enp1s0           UP             192.168.1.50/24 fe80::5054:ff:fe12:3456/64
 ```
 
-Aquí la interfaz se llama `enp1s0`. En el resto de la sección, donde aparece `<interfaz>`, sustituir por el nombre real.
-
-Para mantener el nombre de la interfaz en una variable de entorno y reutilizarla en los comandos siguientes:
+Donde aparece `<interfaz>`, va el nombre real. Para guardarlo en una variable:
 
 ```bash
 export MIIFAZ=$(ip -o -4 route show default | awk '{print $5}')
 echo "Interfaz por defecto: $MIIFAZ"
 ```
 
-Esto extrae la interfaz por la que sale el tráfico hacia internet, que en un servidor con una sola tarjeta es siempre la correcta.
+Toma la interfaz de la ruta por defecto, la correcta en un servidor con una sola tarjeta.
 
-##### 5.5.3 Opción A — DHCP con reserva por MAC (lo más simple)
+##### 7.5.3 Opción A — DHCP con reserva por MAC (lo más simple)
 
-Si el servidor está detrás de un router donde se puede reservar la IP por MAC, este es el camino más simple y robusto: no se modifica nada en el servidor, y la IP permanece estable porque el router siempre asigna la misma.
+Si el router permite reservar la IP por MAC, no se toca nada en el servidor:
 
-Pasos:
-
-1. Anotar la MAC de la interfaz: `ip link show $MIIFAZ` (línea `link/ether ...`).
-2. En la interfaz del router, crear una reserva DHCP para esa MAC con la IP deseada.
-3. Renovar el lease desde el servidor:
+1. Anotar la MAC: `ip link show $MIIFAZ` (línea `link/ether ...`).
+2. Crear la reserva en el router.
+3. Renovar la concesión:
 
    ```bash
    sudo systemctl restart networking
    ```
 
-4. Verificar que la IP asignada coincide con la reservada:
+4. Verificar la IP:
 
    ```bash
    ip -brief address show $MIIFAZ
    ```
 
-Ventajas: cero configuración en el servidor; fácil de migrar entre redes.
-Desventajas: depende del router; no aplica si el servidor está en una red sin control del DHCP.
+Depende del router y no sirve en redes sin control del DHCP.
 
-##### 5.5.4 Opción B — IP estática con `ifupdown` (configuración por defecto)
+##### 7.5.4 Opción B — IP estática con `ifupdown` (configuración por defecto)
 
-Esta es la opción recomendada cuando se necesita IP estática y se quiere mantener el backend que viene por defecto en la netinst. La configuración vive en `/etc/network/interfaces`.
-
-Respaldar el archivo original antes de tocarlo:
+La opción para IP estática manteniendo el backend de la netinst.
 
 ```bash
 sudo cp /etc/network/interfaces /etc/network/interfaces.ori
 ```
 
-Inspeccionar el contenido actual:
-
 ```bash
 cat /etc/network/interfaces
 ```
 
-Salida típica tras una netinst con DHCP:
+Salida típica con DHCP:
 
-```
+```text
 # This file describes the network interfaces available on your system
 # and how to activate them. For more information, see interfaces(5).
 
@@ -1118,15 +1183,15 @@ allow-hotplug enp1s0
 iface enp1s0 inet dhcp
 ```
 
-Para convertir esa interfaz a IP estática, reemplazar el bloque `iface ... inet dhcp` por uno con configuración fija:
+Se edita el archivo:
 
 ```bash
 sudoedit /etc/network/interfaces
 ```
 
-Sustituir el bloque correspondiente por algo como:
+Y el bloque `iface ... inet dhcp` se sustituye por:
 
-```
+```text
 # The primary network interface
 allow-hotplug enp1s0
 iface enp1s0 inet static
@@ -1135,22 +1200,15 @@ iface enp1s0 inet static
     dns-nameservers 192.168.1.1 1.1.1.1
 ```
 
-Notas sobre la sintaxis:
+`address` admite CIDR. `dns-nameservers` necesita `resolvconf` para llegar a `/etc/resolv.conf` (`dpkg -l resolvconf`); sin él, se instala o se usa 7.5.6. Para IPv6 estática se añade un bloque `iface enp1s0 inet6 static`.
 
-- La indentación de las líneas dentro del bloque `iface` no es estrictamente obligatoria, pero mejora la legibilidad y es la convención.
-- `address` admite el formato CIDR (`192.168.1.50/24`). El formato antiguo `address 192.168.1.50` con `netmask 255.255.255.0` por separado también funciona, pero el CIDR es más conciso.
-- `dns-nameservers` requiere el paquete `resolvconf` para que los servidores se propaguen a `/etc/resolv.conf` automáticamente. En netinst este paquete suele venir instalado; verificar con `dpkg -l resolvconf`. Si no está instalado, instalarlo (`sudo apt install -y resolvconf`) o gestionar `/etc/resolv.conf` manualmente (ver subsección 5.5.6).
-- Si el servidor necesita IPv6 estática, añadir un bloque `iface enp1s0 inet6 static` adicional con `address`, `gateway` y `dns-nameservers`.
-
-Aplicar los cambios. La opción más segura es reiniciar el servidor (`sudo reboot`), porque garantiza que la configuración persiste tras un reinicio y no quedan estados intermedios. Si se prefiere aplicar en caliente sin reiniciar:
+Lo más seguro es aplicar con `sudo reboot`, que además prueba la persistencia. En caliente:
 
 ```bash
 sudo ifdown $MIIFAZ && sudo ifup $MIIFAZ
 ```
 
-> **Atención:** ejecutar `ifdown` por SSH desde la propia interfaz que se está reconfigurando deja al servidor inaccesible durante unos segundos. Si la nueva configuración tiene un error, la sesión SSH se pierde y la única forma de recuperar el servidor es por consola física, hypervisor o panel del VPS. Para minimizar el riesgo, usar `&&` (como arriba) en lugar de comandos separados, o ejecutar el ciclo dentro de `tmux` o `screen` para que sobreviva a la desconexión.
-
-Verificar el resultado:
+> **Atención:** `ifdown` por SSH sobre la propia interfaz corta la conexión unos segundos, y si la configuración nueva falla solo queda la consola. Por eso el `&&`, y mejor dentro de `tmux`.
 
 ```bash
 ip -brief address show $MIIFAZ
@@ -1158,16 +1216,14 @@ ip route
 cat /etc/resolv.conf
 ```
 
-##### 5.5.5 Opción C — Migrar a `systemd-networkd` (solo si se justifica)
+##### 7.5.5 Opción C — Migrar a `systemd-networkd` (solo si se justifica)
 
-`systemd-networkd` es el backend recomendado cuando el servidor va a tener configuraciones de red complejas (bonding, VLAN, bridges, múltiples interfaces con políticas de routing distintas), o cuando se prefiere coherencia con el resto del ecosistema systemd. Para un servidor con una sola interfaz y configuración simple, no aporta ventajas respecto a `ifupdown` y añade un punto de cambio innecesario.
+Solo aporta con bonding, VLAN, bridges o varias interfaces con políticas de routing; con una interfaz simple no mejora a `ifupdown`.
 
-Si se decide migrar, los pasos son:
-
-**1. Crear el archivo de configuración antes de desactivar `ifupdown`.** Esto evita quedarse sin red durante la transición:
+**1. Crear la configuración antes de desactivar `ifupdown`**, para no quedarse sin red:
 
 ```bash
-sudo tee /etc/systemd/network/10-${MIIFAZ}.network > /dev/null <<EOF
+sudo install -m 0644 -o root -g root /dev/stdin "/etc/systemd/network/10-${MIIFAZ}.network" <<EOF
 [Match]
 Name=${MIIFAZ}
 
@@ -1179,14 +1235,14 @@ DNS=1.1.1.1
 EOF
 ```
 
-Para configuración por DHCP en lugar de IP estática, reemplazar el bloque `[Network]` por:
+Para DHCP, el bloque `[Network]` es:
 
-```
+```text
 [Network]
 DHCP=yes
 ```
 
-**2. Habilitar `systemd-networkd` y `systemd-resolved`.** El primero gestiona interfaces; el segundo proporciona el resolver DNS local que `systemd-networkd` espera:
+**2. Habilitar `systemd-networkd` y `systemd-resolved`:**
 
 ```bash
 sudo apt install -y systemd-resolved
@@ -1194,23 +1250,21 @@ sudo systemctl enable --now systemd-networkd
 sudo systemctl enable --now systemd-resolved
 ```
 
-> **Nota:** en Trixie, `systemd-resolved` ya no viene preinstalado por defecto (se separó del paquete `systemd` principal). Hay que instalarlo explícitamente. La instalación reemplaza `/etc/resolv.conf` por un symlink al stub de resolved.
+En Trixie `systemd-resolved` es un paquete aparte y su instalación convierte `/etc/resolv.conf` en un enlace al stub.
 
-**3. Desactivar `ifupdown` para la interfaz que se va a migrar.** La forma más limpia es comentar el bloque correspondiente en `/etc/network/interfaces` (no borrarlo, para tener referencia si hay que revertir):
+**3. Comentar en `/etc/network/interfaces`** las líneas `allow-hotplug` e `iface` de la interfaz, sin tocar `lo`:
 
 ```bash
 sudoedit /etc/network/interfaces
 ```
 
-Comentar las líneas `allow-hotplug` e `iface` de la interfaz que pasará a `systemd-networkd`. Mantener intacto el bloque `lo` (loopback).
-
-**4. Reiniciar para aplicar el cambio.** Aplicar en caliente es posible pero arriesgado por la posibilidad de que las dos pilas peleen por la misma interfaz; un reinicio limpio es más predecible:
+**4. Reiniciar**, porque las dos pilas en caliente pueden pelear por la interfaz:
 
 ```bash
 sudo reboot
 ```
 
-**5. Verificar tras el reinicio:**
+**5. Verificar:**
 
 ```bash
 networkctl status
@@ -1220,11 +1274,11 @@ ip -brief address
 ip route
 ```
 
-`networkctl status <interfaz>` debe mostrar la interfaz como `configured` y con la IP correcta. `resolvectl status` debe mostrar los DNS configurados.
+`networkctl status <interfaz>` debe mostrarla `configured` con la IP correcta, y `resolvectl status` los DNS.
 
-##### 5.5.6 DNS sin gestor automático (caso especial)
+##### 7.5.6 DNS sin gestor automático (caso especial)
 
-Si por algún motivo `/etc/resolv.conf` no se pobla automáticamente (servidor sin `resolvconf` ni `systemd-resolved`, configuración heredada inconsistente, etc.), se puede gestionar manualmente:
+Si `/etc/resolv.conf` no se rellena solo:
 
 ```bash
 sudo tee /etc/resolv.conf > /dev/null <<'EOF'
@@ -1233,17 +1287,15 @@ nameserver 9.9.9.9
 EOF
 ```
 
-> **Atención:** un `/etc/resolv.conf` editado a mano será sobrescrito por `resolvconf`, `systemd-resolved` o el cliente DHCP la próxima vez que reciban una nueva configuración. Si se quiere fijarlo de forma realmente permanente sin instalar un gestor, se puede aplicar el atributo de inmutabilidad:
+> **Atención:** `resolvconf`, `systemd-resolved` o el cliente DHCP lo sobrescribirán. Para fijarlo sin gestor:
 >
 > ```bash
 > sudo chattr +i /etc/resolv.conf
 > ```
 >
-> Esto impide cualquier modificación, incluso por root, hasta que se quite el atributo con `sudo chattr -i /etc/resolv.conf`. Es una solución de fuerza bruta y conviene documentarla en el inventario del servidor (sección 20.1) para que no sorprenda a quien intente modificar la red en el futuro.
+> Ni root puede modificarlo hasta `sudo chattr -i /etc/resolv.conf`. Se anota en el inventario (22.1).
 
-##### 5.5.7 Verificación final
-
-Independientemente del backend elegido y de si la IP es estática o por DHCP:
+##### 7.5.7 Verificación final
 
 ```bash
 ip -brief address           # IP correcta en la interfaz
@@ -1253,29 +1305,27 @@ ping -c 3 1.1.1.1           # conectividad IP a internet
 ping -c 3 deb.debian.org    # conectividad + DNS
 ```
 
-Los cinco comandos deben tener éxito. Si `ping 1.1.1.1` funciona pero `ping deb.debian.org` falla, el problema es DNS. Si `ip route` no muestra una ruta `default`, el problema es el gateway. Si `ip -brief address` no muestra IP en la interfaz esperada, el problema está en la configuración del backend (revisar `journalctl -u networking` para `ifupdown`, `journalctl -u systemd-networkd` para `systemd-networkd`).
+Los cinco deben funcionar. Si `ping 1.1.1.1` va y `ping deb.debian.org` no, es DNS; sin ruta `default`, el gateway; sin IP en la interfaz, el backend (`journalctl -u networking` o `journalctl -u systemd-networkd`).
 
-##### 5.5.8 Persistencia entre reinicios
+##### 7.5.8 Persistencia entre reinicios
 
-Antes de dar por cerrada la sección, conviene reiniciar el servidor una vez y volver a ejecutar las verificaciones del paso 5.5.7. Una configuración que funciona en caliente pero no sobrevive al reinicio es uno de los errores más frustrantes y comunes; detectarlo ahora, mientras la sesión de rescate (sección 4.4) sigue abierta y el servidor está en su entorno de despliegue inicial, es mucho más barato que descubrirlo tras el primer reinicio en producción.
+Una configuración que funciona en caliente y no sobrevive al reinicio se detecta ahora, con la sesión de rescate abierta (6.4):
 
 ```bash
 sudo reboot
 ```
 
-Tras el reinicio, reconectar y repetir las verificaciones de 5.5.7. Solo cuando la red está funcional tras un reinicio limpio se puede pasar a la siguiente sección.
+Tras reconectar, se repite 7.5.7.
 
-#### 5.6 `machine-id`
+#### 7.6 `machine-id`
 
-El `machine-id` identifica unívocamente la instalación. En VMs clonadas desde plantilla, este identificador se duplica y causa problemas sutiles (leases DHCP duplicadas, logs mezclados, identificación errónea en systemd).
-
-Verificar:
+**Opcional:** solo en VMs clonadas de una plantilla, donde el identificador se duplica y causa concesiones DHCP repetidas y logs mezclados.
 
 ```bash
 cat /etc/machine-id
 ```
 
-Si esta instalación proviene de un clon de plantilla, regenerar:
+Si es un clon:
 
 ```bash
 sudo rm /etc/machine-id /var/lib/dbus/machine-id
@@ -1284,29 +1334,25 @@ sudo dbus-uuidgen --ensure
 sudo reboot
 ```
 
-Para instalaciones limpias (no clonadas), no hacer nada: el ID ya es único.
+### 8. Repositorios y primera actualización completa
 
-### 6. Repositorios y primera actualización completa
+La `netinst` deja el CD-ROM como repositorio. Aquí se pasa a los mirrors oficiales y se actualiza todo.
 
-La ISO `netinst` instala un sistema mínimo con el CD-ROM como repositorio inicial. Esta sección ajusta `/etc/apt/sources.list` para usar los mirrors oficiales y deja el sistema completamente actualizado.
-
-#### 6.1 Respaldo del `sources.list` original
+#### 8.1 Respaldo del `sources.list` original
 
 ```bash
 sudo cp /etc/apt/sources.list /etc/apt/sources.list.ori
 ```
 
-Conservar el original es útil para comparar en caso de problemas futuros.
-
-#### 6.2 Edición del `sources.list`
+#### 8.2 Edición del `sources.list`
 
 ```bash
 sudoedit /etc/apt/sources.list
 ```
 
-Contenido recomendado para Debian 13 Trixie:
+Contenido para Debian 13 Trixie:
 
-```
+```text
 # Repositorio principal
 deb https://deb.debian.org/debian/ trixie main contrib non-free non-free-firmware
 
@@ -1317,22 +1363,27 @@ deb https://deb.debian.org/debian/ trixie-updates main contrib non-free non-free
 deb https://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
 ```
 
-Notas sobre los componentes:
+`main` es software libre soportado por Debian; `contrib`, libre con dependencias no libres; `non-free`, propietario, solo si hace falta; `non-free-firmware`, firmware separado en Trixie, que conviene mantener por el hardware moderno. `deb-src` se omite salvo que se compile desde fuente. La línea del CD-ROM se comenta:
 
-- `main` — software 100% libre, soportado por el proyecto Debian.
-- `contrib` — software libre pero con dependencias no libres.
-- `non-free` — software no libre (licencias propietarias). Se incluye en servidores solo si es necesario.
-- `non-free-firmware` — firmware no libre separado en Trixie por cambio de política. Recomendable mantenerlo activo para compatibilidad con hardware moderno (tarjetas de red, controladores, etc.).
-
-Las líneas `deb-src` (fuentes) se omiten por defecto en un servidor. Añadirlas solo si se van a compilar paquetes desde fuente.
-
-Comentar o eliminar la línea que referencia al CD-ROM:
-
-```
+```text
 # deb cdrom:[...]  (línea comentada o eliminada)
 ```
 
-#### 6.3 Actualización completa
+Las imágenes cloud traen el repositorio en `/etc/apt/sources.list.d/debian.sources` (deb822, con `mirror+file:`, `deb-src`, backports y solo `main`). Con los dos activos, APT descarga los índices dos veces sin avisar. Antes de `apt update`:
+
+```bash
+ls -la /etc/apt/sources.list.d/
+```
+
+Si aparece `debian.sources`, se aparta como referencia:
+
+```bash
+sudo mv /etc/apt/sources.list.d/debian.sources /etc/apt/debian.sources.ori
+```
+
+También vale lo contrario: mantener el formato deb822 y llevar a `debian.sources` los componentes de arriba. Lo que no debe haber son las dos fuentes activas.
+
+#### 8.3 Actualización completa
 
 ```bash
 sudo apt update
@@ -1341,40 +1392,33 @@ sudo apt autoremove --purge -y
 sudo apt clean
 ```
 
-Diferencia entre `upgrade` y `full-upgrade`:
+`upgrade` no instala ni retira paquetes, así que deja sin actualizar lo que cambia de dependencias; `full-upgrade` sí lo hace. En producción se revisa antes con `apt full-upgrade --dry-run`; en una instalación nueva se aplica directamente.
 
-- `upgrade` — actualiza paquetes sin instalar nuevos ni eliminar existentes. Si un paquete requiere cambios de dependencias, se queda sin actualizar.
-- `full-upgrade` — actualiza todo, incluyendo paquetes que requieren instalar o eliminar otros. Es el equivalente a `dist-upgrade` en versiones antiguas.
-
-En un sistema de producción `full-upgrade` se revisa antes de aplicarse (`apt full-upgrade --dry-run`). En una instalación recién desplegada, aplicarlo directamente es correcto.
-
-#### 6.4 Reinicio si fue actualizado el kernel
+#### 8.4 Reinicio si fue actualizado el kernel
 
 ```bash
 ls /boot/vmlinuz-*
 uname -r
 ```
 
-Si la versión listada en `/boot` es superior a la activa (`uname -r`), reiniciar para usar el kernel nuevo:
+Si `/boot` tiene una versión superior a `uname -r`:
 
 ```bash
 sudo reboot
 ```
 
-Alternativamente, Debian informa cuándo se necesita reinicio mediante el paquete `needrestart` (opcional):
+`needrestart`, opcional, avisa de qué necesita reinicio:
 
 ```bash
 sudo apt install -y needrestart
 sudo needrestart
 ```
 
-### 7. Usuarios y privilegios
+### 9. Usuarios y privilegios
 
-Esta sección formaliza la política de usuarios del servidor: confirma que el usuario administrativo tiene los grupos correctos, define política de contraseñas, y bloquea la cuenta de root.
+Grupos del usuario administrativo, endurecimiento de sudo, política de contraseñas y bloqueo de root.
 
-La configuración detallada de `sudo` (políticas en `/etc/sudoers.d/`, insults, pwfeedback, etc.) se ha dejado deliberadamente para la Etapa III (hardening), porque son decisiones de endurecimiento, no de configuración base.
-
-#### 7.1 Verificación del usuario administrativo
+#### 9.1 Verificación del usuario administrativo
 
 ```bash
 export MIUSUARIO=usuario
@@ -1383,47 +1427,36 @@ id "${MIUSUARIO:?}"
 
 Salida esperada:
 
-```
+```text
 uid=1000(<usuario>) gid=1000(<usuario>) grupos=1000(<usuario>),27(sudo),...
 ```
 
-El grupo `sudo` (GID 27 en Debian) debe estar presente. Si no, añadirlo:
+Debe estar el grupo `sudo` (GID 27). Si falta:
 
 ```bash
 sudo usermod -aG sudo "${MIUSUARIO:?}"
 ```
 
-> **Nota:** las variables exportadas solo existen en la sesión donde se definieron. Al reconectar por SSH, o dentro de una shell abierta con `sudo -i` (que limpia el entorno por `env_reset`), `MIUSUARIO` está vacía y hay que volver a definirla. La forma `${MIUSUARIO:?}` convierte ese olvido en un error visible en lugar de un comando ejecutado con un argumento vacío.
+> **Nota:** las variables exportadas solo existen en su sesión. Tras reconectar, o dentro de `sudo -i` (que limpia el entorno), `MIUSUARIO` está vacía. `${MIUSUARIO:?}` convierte el olvido en un error visible.
 
-#### 7.2 Grupos recomendados para el usuario administrativo
+#### 9.2 Grupos recomendados para el usuario administrativo
 
-Añadir el usuario al grupo `adm` permite leer logs del sistema sin `sudo`. Es una comodidad razonable en un servidor con un solo administrador:
+`adm` permite leer logs sin `sudo`:
 
 ```bash
 sudo usermod -aG adm "${MIUSUARIO:?}"
 ```
 
-Otros grupos que pueden ser útiles según el rol futuro del servidor (no se añaden ahora, solo se documentan):
+Otros grupos dan privilegios equivalentes a root (`docker`) o solo sirven a roles concretos (`wireshark`, `kvm`, `libvirt`; `systemd-journal` sobra con `adm`). Se tratan como concesión de permisos y se añaden solo si el rol lo justifica.
 
-- `systemd-journal` — lectura del journal de systemd (redundante si ya está en `adm`).
-- `wireshark` — captura de tráfico sin privilegios (solo si se instala wireshark).
-- `docker` — administración de Docker sin `sudo` (nota: equivale a root; solo en servidores donde esto se acepte).
-- `kvm`, `libvirt` — gestión de VMs sin `sudo`.
+#### 9.3 Hardening de sudo
 
-La pertenencia a grupos privilegiados debe tratarse como concesión de permisos, no como conveniencia. Revisar en cada caso si el acceso directo al grupo se justifica o conviene mantener `sudo` como barrera.
+Tickets largos, sesiones sin registro y entornos heredados son la superficie de `sudo`. La configuración va en `/etc/sudoers.d/`, sin tocar el archivo del paquete, y se ejecuta y verifica desde la sesión del usuario administrativo: root pasa cualquier comprobación de sudo aunque la configuración esté rota. La excepción es 9.3.3, que necesita una shell de root abierta como red de seguridad.
 
-#### 7.3 Hardening de sudo
-
-`sudo` tiene su propia superficie de seguridad: tickets de larga duración permiten que una sesión desatendida pueda ser aprovechada; sin logging, las acciones ejecutadas con privilegios de root no quedan registradas; sin entorno limpio, variables heredadas pueden manipular el comportamiento de los programas invocados como root.
-
-La configuración se hace en un archivo separado dentro de `/etc/sudoers.d/` para no tocar el archivo canónico gestionado por el paquete.
-
-Toda esta sección se ejecuta y se verifica desde la sesión del usuario administrativo, no desde una shell de root. Como root pasa cualquier comprobación de sudo por definición, una verificación hecha ahí devuelve el resultado correcto aunque la configuración esté rota. La única excepción es la verificación de 7.3.3, que necesita una shell de root abierta de antemano como red de seguridad.
-
-##### 7.3.1 Archivo de hardening de sudoers
+##### 9.3.1 Archivo de hardening de sudoers
 
 ```bash
-sudo tee /etc/sudoers.d/99-hardening > /dev/null <<'EOF'
+tee /tmp/99-hardening > /dev/null <<'EOF'
 # Limpiar el entorno heredado antes de ejecutar como root
 Defaults env_reset
 
@@ -1447,50 +1480,48 @@ Defaults!/usr/bin/journalctl !log_output
 Defaults mail_badpass
 EOF
 
-# Verificar la sintaxis antes de que tome efecto (un error aquí puede inhabilitar sudo)
-sudo visudo -c -f /etc/sudoers.d/99-hardening
+# Validar fuera de /etc/sudoers.d/ e instalar solo si la sintaxis es correcta
+sudo visudo -c -f /tmp/99-hardening && \
+sudo install -m 0440 -o root -g root /tmp/99-hardening /etc/sudoers.d/99-hardening
+rm -f /tmp/99-hardening
 ```
 
-Si `visudo -c` no devuelve error, aplicar permisos correctos:
+El archivo se escribe y se valida en `/tmp` porque todo lo que está en `/etc/sudoers.d/` entra en vigor al instante: con un error de sintaxis, sudo dejaría de funcionar antes de poder corregirlo. `install` lo coloca ya con `0440` y `root:root`, y el bloque se puede repetir.
 
-```bash
-sudo chmod 440 /etc/sudoers.d/99-hardening
-sudo chown root:root /etc/sudoers.d/99-hardening
-```
+`log_output` guarda en `/var/log/sudo-io/` lo que imprime cada orden. Para `journalctl` sería una copia del journal que crece con cada consulta, así que la excepción solo deja de guardar su salida; la línea `COMMAND=` del journal sigue registrando quién consultó y cuándo. Los `Defaults` por comando se aplican después de los globales, sin importar el orden. La retención de `/var/log/sudo-io/` es la 18.2.1.
 
-Sobre la excepción de `journalctl`: `log_output` guarda en `/var/log/sudo-io/` todo lo que la orden imprime. Para la mayoría de comandos administrativos eso es evidencia valiosa, pero para `journalctl` es una copia del propio journal que crece con cada consulta; un `sudo journalctl -f` olvidado en una terminal la hace crecer sin límite. La excepción conserva la traza de quién consultó los logs y cuándo (la línea `COMMAND=` que sudo escribe en el journal) y solo deja de guardar la salida. sudo aplica los `Defaults` específicos de comando después de los globales, así que el orden de las líneas dentro del archivo no importa. La retención de `/var/log/sudo-io/` se configura en la sección 16.2.1, porque `logrotate` no la cubre.
-
-> Sobre `requiretty`: la plantilla la deja comentada a propósito. La directiva impide usar sudo desde cualquier contexto sin TTY, y eso no se limita a Ansible: también rompe sudo desde cron, desde units de systemd, y desde cualquier script de mantenimiento o respaldo que se ejecute sin sesión interactiva. El beneficio defensivo es modesto frente a lo que inhabilita, y el síntoma —un script que funciona a mano y falla en su timer, sin más error que `sorry, you must have a tty to run sudo`— es desagradable de diagnosticar. Activarla solo en servidores operados exclusivamente a mano, y anotarlo en el runbook (§20.3). Si se activa y luego hace falta una excepción puntual:
+> `requiretty` queda comentada a propósito: rompe sudo en cron, en units de systemd y en cualquier script sin TTY, con un `sorry, you must have a tty to run sudo` difícil de diagnosticar. Solo se activa en servidores operados exclusivamente a mano, anotándolo en el runbook (22.3). Una excepción puntual se declara así:
 >
-> ```
+> ```text
 > Defaults:miusuario_ansible !requiretty
 > ```
 
-> `mail_badpass` depende del reenvío de correo de la sección 19, que se configura bastante después. Hasta entonces cada contraseña incorrecta intenta un envío que no llega a ninguna parte, sin consecuencias para el sistema. No es necesario retirar la directiva: al terminar la Etapa IV empieza a funcionar sola.
+> `mail_badpass` empieza a funcionar cuando el correo de la sección 21 esté configurado. Hasta entonces sus envíos no llegan a ninguna parte, sin consecuencias.
 
-##### 7.3.2 Verificación
+##### 9.3.2 Verificación
 
 ```bash
 sudo visudo -c      # verifica la sintaxis de todo el árbol sudoers
 sudo -l             # lista los privilegios del usuario actual con la nueva configuración
 ```
 
-Estas dos órdenes se ejecutan desde la sesión del usuario administrativo. Como root, `sudo -l` describe los privilegios de root y no los de nadie más, de modo que una configuración rota para `$MIUSUARIO` pasa la prueba sin que nada lo delate. Si hace falta consultar los privilegios de otro usuario sin abrir su sesión, la forma correcta es:
+Como root, `sudo -l` describe a root, y una configuración rota para `$MIUSUARIO` pasaría. Para consultar a otro usuario sin abrir su sesión:
 
 ```bash
 sudo -l -U "${MIUSUARIO:?}"
 ```
 
-Cada archivo de `/etc/sudoers.d/` debe quedar con modo `0440` y propietario `root:root`. Si no, `visudo -c` lo reporta con `bad permissions, should be mode 0440` y termina con error, aunque sudo siga leyendo el archivo (sudo solo rechaza los que el grupo u otros pueden escribir). `visudo -f` no garantiza esos permisos al crear un archivo nuevo, así que tras crearlo se aplican siempre de forma explícita:
+Cada archivo de `/etc/sudoers.d/` va con `0440` y `root:root`; si no, `visudo -c` falla con `bad permissions`. `visudo -f` no lo garantiza al crear, así que se aplica siempre:
 
 ```bash
-sudo chown root:root /etc/sudoers.d/<archivo>
-sudo chmod 0440 /etc/sudoers.d/<archivo>
+export ARCHIVO_SUDOERS=99-hardening   # el archivo creado o editado
+sudo chown root:root "/etc/sudoers.d/${ARCHIVO_SUDOERS:?}"
+sudo chmod 0440 "/etc/sudoers.d/${ARCHIVO_SUDOERS:?}"
 ```
 
-> **Nota:** `@includedir` ignora los archivos cuyo nombre contiene un punto o termina en `~`. Un `/etc/sudoers.d/99-hardening.conf` no tendría ningún efecto, sin que nada avise.
+> **Nota:** `@includedir` ignora archivos con punto en el nombre o terminados en `~`. Un `99-hardening.conf` no tendría efecto, sin aviso.
 
-Para comprobar que el registro de E/S y la excepción de `journalctl` funcionan, desde la sesión del usuario administrativo:
+Para comprobar el registro de E/S y la excepción de `journalctl`:
 
 ```bash
 sudo true
@@ -1498,26 +1529,26 @@ sudo journalctl -n 1 > /dev/null
 sudo journalctl -n 6 _COMM=sudo | grep COMMAND
 ```
 
-La línea de `COMMAND=/usr/bin/true` debe llevar un campo `TSID=`, que es el identificador de la sesión grabada en `/var/log/sudo-io/`. Las líneas de `journalctl` no deben llevarlo.
+La línea de `COMMAND=/usr/bin/true` debe llevar `TSID=`, el identificador de la sesión grabada. Las de `journalctl`, no.
 
-##### 7.3.3 pam_faillock — lockout PAM para escalada local
+##### 9.3.3 pam_faillock — lockout PAM para escalada local
 
-fail2ban (sección 10) protege contra fuerza bruta sobre SSH. No protege contra intentos de escalada local: un atacante con acceso a la consola o con una sesión no privilegiada puede intentar `su -` o contraseñas de `sudo` repetidamente sin que fail2ban intervenga. `pam_faillock` (incluido en `libpam-modules`, sin instalación adicional) añade lockout a nivel PAM cubriendo cualquier servicio que pase por `pam_unix`: login de consola, `su`, `sudo`, y SSH cuando usa PAM.
+**Opcional, recomendado.** fail2ban protege SSH, no la escalada local: con una sesión sin privilegios se pueden probar contraseñas de `sudo` o `su -` sin límite. `pam_faillock`, incluido en `libpam-modules`, bloquea la cuenta tras varios fallos en cualquier servicio que pase por `pam_unix`.
 
-Esta es la subsección más delicada del manual completo. Una edición mal hecha en `/etc/pam.d/common-auth` deja el sistema sin autenticación por contraseña para ningún usuario, con el archivo sintácticamente válido y sin un solo error en los logs. Si root ya está bloqueado (7.6) y el acceso por llave SSH falla, el único camino de vuelta es la consola de rescate del proveedor.
+Es la subsección más delicada del manual. Un error en `/etc/pam.d/common-auth` deja a todos sin autenticación por contraseña, con el archivo válido y ningún error en los logs; con root bloqueado (9.6), solo queda la consola del proveedor.
 
-Requisito previo: el usuario administrativo necesita una contraseña utilizable, porque es la que sudo va a pedir. Un usuario creado con `adduser --disabled-password` para acceso solo por llave SSH no la tiene, y la verificación de esta subsección fracasaría sin que exista nada que arreglar en PAM.
+El usuario administrativo necesita contraseña, porque es la que sudo pedirá:
 
 ```bash
 sudo passwd -S "${MIUSUARIO:?}"
 ```
 
-La segunda columna debe ser `P`. Si muestra `L` o `NP`, asignar la contraseña con `sudo passwd "${MIUSUARIO:?}"` antes de continuar.
+La segunda columna debe ser `P`; si no, `sudo passwd "${MIUSUARIO:?}"`.
 
-Configuración del comportamiento:
+Configuración:
 
 ```bash
-sudo tee /etc/security/faillock.conf > /dev/null <<'EOF'
+sudo install -m 0644 -o root -g root /dev/stdin /etc/security/faillock.conf <<'EOF'
 # Número de fallos antes de bloquear la cuenta
 deny = 5
 
@@ -1535,23 +1566,24 @@ silent
 EOF
 ```
 
-Activación en PAM. Antes de editar, abrir una shell de root en la sesión paralela (4.4) y dejarla abierta hasta terminar la verificación:
+Antes de editar PAM se abre una shell de root en la sesión paralela (6.4) y se deja abierta hasta terminar:
 
 ```bash
 sudo -i
 # No cerrar esta shell hasta que la verificación de más abajo haya pasado
+export MIUSUARIO=usuario
 ```
 
-Desde la sesión principal, respaldar y editar:
+Dentro de `sudo -i` se vuelve a definir `MIUSUARIO` (9.1); sin ella, `su -` y `faillock` fallan con `parameter null or not set`. Desde la sesión principal:
 
 ```bash
 sudo cp /etc/pam.d/common-auth /etc/pam.d/common-auth.ori
 sudoedit /etc/pam.d/common-auth
 ```
 
-El archivo que trae Debian contiene tres líneas activas, en este orden: el `pam_unix.so` que autentica, y un bloque de cierre con `pam_deny.so` y `pam_permit.so`. Las tres líneas de `pam_faillock` se insertan alrededor del `pam_unix.so` existente, sin mover ni comentar el bloque de cierre, que debe quedar al final del archivo. El resultado efectivo —el que se obtiene filtrando comentarios y líneas vacías— tiene que ser exactamente este:
+Debian trae tres líneas activas: el `pam_unix.so` que autentica y el cierre con `pam_deny.so` y `pam_permit.so`. Las tres de faillock van alrededor de `pam_unix.so`, con el cierre al final. Sin comentarios ni líneas vacías, el resultado debe ser exactamente:
 
-```
+```text
 auth    required                        pam_faillock.so preauth
 auth    [success=1 default=ignore]      pam_unix.so nullok
 auth    [default=die]                   pam_faillock.so authfail
@@ -1560,21 +1592,17 @@ auth    requisite                       pam_deny.so
 auth    required                        pam_permit.so
 ```
 
-Comprobar el orden antes de probar nada:
-
 ```bash
 grep -vE '^\s*#|^\s*$' /etc/pam.d/common-auth
 ```
 
-> **ATENCIÓN.** El error más fácil de cometer es añadir el bloque de faillock al final del archivo, debajo de `pam_deny.so`. `pam_deny.so` declarado como `requisite` rechaza y aborta la pila de inmediato, así que todo lo que venga después nunca se ejecuta: ni faillock ni `pam_unix`. El resultado es que ninguna contraseña funciona para ningún usuario no-root, en sudo, en `su` y en el login de consola. La sintaxis es válida, `pam-auth-update` no se queja, y el journal no registra ningún fallo de autenticación porque la autenticación nunca llega a intentarse. Verificar con el `grep` de arriba que `pam_deny.so` y `pam_permit.so` son las dos últimas líneas.
->
-> Para revertir desde la shell de root que quedó abierta:
+> **ATENCIÓN.** El error más fácil es añadir faillock al final, debajo de `pam_deny.so`. Como `requisite`, `pam_deny.so` aborta la pila y lo que sigue no se ejecuta: ninguna contraseña funciona para ningún usuario no-root, sin errores de sintaxis ni registros de fallo. `pam_deny.so` y `pam_permit.so` deben ser las dos últimas líneas. Para revertir desde la shell de root:
 >
 > ```bash
 > cp /etc/pam.d/common-auth.ori /etc/pam.d/common-auth
 > ```
 
-Verificación. Se hace desde la shell de root, invocando una sesión del usuario administrativo, de modo que un fallo no deje a nadie fuera del sistema:
+Verificación desde la shell de root, invocando una sesión del usuario, para que un fallo no deje a nadie fuera:
 
 ```bash
 su - "${MIUSUARIO:?}"
@@ -1583,25 +1611,64 @@ sudo true      # debe pedir la contraseña del usuario y aceptarla
 exit
 ```
 
-Si `sudo true` acepta la contraseña, la pila está bien y se puede cerrar la shell de root. Si la rechaza, el problema es el orden de PAM y no la contraseña: revertir con el respaldo y revisar el `grep`.
-
-Comprobado eso, provocar el bloqueo. Desde la sesión del usuario administrativo, con la shell de root todavía abierta:
+Si `sudo true` acepta la contraseña, la pila está bien. Si la rechaza, es el orden de PAM: se revierte y se revisa el `grep`. Después se provoca el bloqueo desde la sesión del usuario, con la shell de root todavía abierta:
 
 ```bash
 sudo -k
-sudo true      # introducir una contraseña incorrecta hasta agotar los intentos, varias veces
+sudo true      # 3 contraseñas incorrectas
+sudo true      # otras 3 incorrectas: con deny = 5 la cuenta queda bloqueada
+sudo true      # ahora la contraseña CORRECTA: debe rechazarla
 ```
 
-El `sudo -k` descarta el ticket vigente; sin él, sudo no pediría contraseña durante `timestamp_timeout` y la prueba no contaría nada. De vuelta en la shell de root, comprobar el bloqueo y deshacerlo:
+`sudo -k` descarta el ticket. Con 3 intentos por ejecución, hacen falta dos rondas para llegar a `deny = 5`. La tercera es la que prueba algo: con la cuenta bloqueada, la contraseña correcta debe rechazarse. Que faillock cuente fallos no basta, porque también los cuenta con la pila rota. Por `silent`, el rechazo parece una contraseña incorrecta.
+
+En la shell de root:
 
 ```bash
 faillock --user "${MIUSUARIO:?}"
 faillock --user "${MIUSUARIO:?}" --reset
 ```
 
-Una cuenta bloqueada no puede desbloquearse a sí misma: `sudo faillock --reset` pediría la contraseña y fallaría por el propio bloqueo, sin otro mensaje que el de contraseña incorrecta (`silent`). Por eso la prueba necesita la shell de root abierta de antemano.
+Deben salir exactamente cinco fallos válidos (`V`):
 
-Diagnóstico cuando sudo rechaza una contraseña que debería ser válida. El mensaje es el mismo en los cuatro casos, así que hay que discriminar por comandos:
+```text
+usuario:
+When                Type  Source                                           Valid
+2026-10-17 11:07:13 TTY   /dev/pts/0                                           V
+2026-10-17 11:07:16 TTY   /dev/pts/0                                           V
+2026-10-17 11:07:19 TTY   /dev/pts/0                                           V
+2026-10-17 11:07:33 TTY   /dev/pts/0                                           V
+2026-10-17 11:07:44 TTY   /dev/pts/0                                           V
+```
+
+Los intentos posteriores no aparecen porque el `preauth` los rechaza antes. Una cuenta bloqueada no puede desbloquearse con su propio `sudo`, de ahí la shell de root previa.
+
+Con las dos pruebas superadas, se guarda la pila verificada como referencia:
+
+```bash
+sudo install -m 0644 -o root -g root /etc/pam.d/common-auth /etc/pam.d/common-auth.faillock
+```
+
+> **ATENCIÓN.** La edición manual no sobrevive a `pam-auth-update`, que el postinst de los paquetes con módulos PAM ejecuta al instalarse o actualizarse, y que regenera el bloque entre `# here are the per-package modules` y `# end of pam-auth-update config`. Si los `common-*` ya tienen cambios locales, pregunta antes con un diálogo ("¿Desea sobreescribir los cambios locales...?"). El caso observado es el más engañoso: reaparece un `pam_unix.so` antes del `preauth` y una cuenta bloqueada entra con la contraseña correcta, sin que nada falle a la vista.
+>
+> Por eso, tras instalar o actualizar cualquier paquete `libpam-*`:
+>
+> ```bash
+> diff <(grep -vE '^\s*#|^\s*$' /etc/pam.d/common-auth.faillock) \
+>      <(grep -vE '^\s*#|^\s*$' /etc/pam.d/common-auth) && echo "✓ pila de faillock intacta"
+> ```
+>
+> Si `diff` muestra diferencias, se revisa qué añadió `pam-auth-update`, porque puede ser un módulo nuevo legítimo. Si es solo el `pam_unix.so` reactivado dentro del bloque, se vuelve a comentar:
+>
+> ```bash
+> sudo sed -i 's/^auth\t\[success=1 default=ignore\]\tpam_unix\.so nullok$/# &/' /etc/pam.d/common-auth
+> ```
+>
+> El patrón exige tabuladores, los de `pam-auth-update`, así que no toca el `pam_unix.so` puesto a mano con espacios. Después se repiten las dos pruebas.
+>
+> Ante el diálogo se responde "Sí" y se sigue igual; así se comprobó al instalar `libpam-wtmpdb` (14.4). Con "No", `pam-auth-update` deja de gestionar los archivos y no incorpora módulos nuevos; esa rama no se ha probado. La solución de raíz, un perfil de faillock en `/usr/share/pam-configs/`, está pendiente de validación en el To-do.
+
+Cuando sudo rechaza una contraseña que debería valer, el mensaje es siempre el mismo:
 
 | Comprobación | Resultado | Causa |
 |---|---|---|
@@ -1610,219 +1677,149 @@ Diagnóstico cuando sudo rechaza una contraseña que debería ser válida. El me
 | `passwd -S <usuario>` | segunda columna `L` o `NP` | la cuenta no tiene contraseña utilizable |
 | `su - <usuario>` desde root | acepta la contraseña, sudo no | problema en `/etc/pam.d/sudo` o en `/etc/sudoers.d/` |
 
-Una tabla de faillock vacía después de varios intentos fallidos es un síntoma, no una señal de normalidad: significa que `pam_faillock.so authfail` nunca se ejecutó. El journal lo confirma, porque en ese escenario tampoco aparece ningún `authentication failure` de `pam_unix`:
+Una tabla vacía tras varios fallos significa que `authfail` nunca se ejecutó; el journal tampoco tendrá `authentication failure` de `pam_unix`:
 
 ```bash
 sudo journalctl --since "10 minutes ago" | grep -iE 'pam|faillock'
 ```
 
-> **Nota:** en VPS con cloud-init, completar antes la sección 7.3.4 si la regla heredada afecta al usuario administrativo. Mientras exista un `NOPASSWD` para ese usuario, sudo no lo autentica y esta prueba no dispara ningún bloqueo.
+> **Nota:** si queda un `NOPASSWD` para el usuario (5.2), sudo no lo autentica y la prueba no bloquea nada.
 
-Comandos de operación:
+Operación:
 
 ```bash
 # Ver el estado de bloqueo de cualquier usuario
-sudo faillock --user <usuario>
+sudo faillock --user "${MIUSUARIO:?}"
 
 # Desbloquear manualmente
-sudo faillock --user <usuario> --reset
+sudo faillock --user "${MIUSUARIO:?}" --reset
 
-# Ver los eventos de fallo en auditd (requiere auditd activo, sección 12)
+# Ver los eventos de fallo en auditd (requiere auditd activo, sección 14.1)
 sudo ausearch -m USER_LOGIN -sv no | tail -20
 ```
 
-##### 7.3.4 Reglas heredadas del aprovisionamiento (VPS con cloud-init)
+#### 9.4 Política de contraseñas
 
-Las imágenes cloud (Azure, AWS y buena parte de los VPS) dejan en el primer arranque un archivo `/etc/sudoers.d/90-cloud-init-users` con una regla `NOPASSWD`. A quién beneficia esa regla depende de cómo aprovisione el proveedor, y la diferencia importa:
-
-```
-# User rules for <usuario>
-<usuario> ALL=(ALL) NOPASSWD:ALL
-```
-
-Si la regla es para el usuario administrativo creado por cloud-init, las consecuencias son serias. Las reglas de sudo se suman, así que `99-hardening` no la anula. Y como `@includedir` está al final de `/etc/sudoers`, esta es la última regla que coincide para el usuario, que es la que sudo aplica: ningún comando pide contraseña. Quien consiga la llave SSH del administrador obtiene root sin otra barrera, `pam_faillock` (7.3.3) nunca se dispara para sudo porque sudo no pasa por la autenticación de PAM, y `mail_badpass` (7.3.1) nunca tiene nada que notificar.
-
-Si la regla es para root —el caso de los proveedores que entregan la máquina con root como única cuenta y dejan al operador crear la suya— el efecto práctico es nulo, porque root no necesita sudo para nada. Igual conviene retirarla: es un hallazgo que marcan lynis y las guías CIS, y explicarlo en una auditoría cuesta más que borrar el archivo.
-
-Detección, desde la sesión del usuario administrativo:
-
-```bash
-ls -l /etc/sudoers.d/
-sudo grep -rn NOPASSWD /etc/sudoers /etc/sudoers.d/
-sudo -k
-sudo true                      # si no pide contraseña, NOPASSWD está activo
-sudo -l | grep -i nopasswd     # muestra "(ALL) NOPASSWD: ALL" si está activo
-```
-
-> **ATENCIÓN:** estas tres últimas órdenes no sirven ejecutadas como root. Un `sudo -l` desde root devuelve `(ALL) NOPASSWD: ALL` siempre, por la regla implícita que root tiene sobre sí mismo, exista o no el archivo de cloud-init. Interpretar esa salida como confirmación del problema lleva a buscar una regla que puede no existir.
-
-> **Atención:** `sudo -v` tampoco sirve como prueba. Con el valor por defecto `verifypw=all`, `sudo -v` pide contraseña si al menos una de las reglas del usuario la exige, y la regla `%sudo ALL=(ALL:ALL) ALL` de `/etc/sudoers` la exige. Pide contraseña aunque todos los demás comandos se ejecuten sin ella.
-
-Antes de retirar la regla, si beneficia al usuario administrativo, hay que confirmar que ese usuario tiene una contraseña funcional; si no, se queda sin sudo:
-
-```bash
-sudo passwd -S "${MIUSUARIO:?}"
-```
-
-La segunda columna debe ser `P` (contraseña establecida), por ejemplo `usuario P 2026-09-26 1 90 14 -1`. Si muestra `L` o `NP`, asignarla primero con `sudo passwd "${MIUSUARIO:?}"`. Confirmar también la pertenencia al grupo `sudo` (7.1).
-
-Conviene además leer el archivo completo antes de borrarlo. Son pocos bytes y puede contener más de una regla:
-
-```bash
-sudo cat /etc/sudoers.d/90-cloud-init-users
-```
-
-Con una segunda sesión SSH abierta como respaldo (4.4):
-
-```bash
-sudo rm /etc/sudoers.d/90-cloud-init-users
-sudo visudo -c
-sudo -k
-sudo true      # ahora debe pedir contraseña
-```
-
-El `visudo -c` no es opcional ni decorativo: conviene dejarlo como paso fijo después de cualquier cambio en `/etc/sudoers.d/`. Un árbol de sudoers con un error de sintaxis inhabilita la escalada de privilegios por completo, y la única vía de reparación es la consola de rescate.
-
-Cerrar la sesión de respaldo solo después de comprobar que `sudo true` pide la contraseña y la acepta. El cambio es inmediato: el propio `visudo -c` ya la pedirá.
-
-Sobre la regeneración: el módulo de usuarios de cloud-init se ejecuta una vez por instancia, así que el archivo no reaparece en reinicios normales. Solo volvería si cambia el identificador de instancia, por ejemplo al redesplegar la VM o capturar su imagen. Es preferible detectarlo a prevenirlo: AIDE (12.4) vigila `/etc` con la configuración por defecto de Debian, así que un `90-cloud-init-users` nuevo aparecerá en su informe diario.
-
-> Desactivar cloud-init por completo también elimina el riesgo de regeneración, pero no es una decisión que se tome desde esta sección. En algunas plataformas cloud-init participa en la configuración de red, y desactivarlo sin comprobarlo deja el servidor sin conectividad en el siguiente arranque. La comprobación pertinente es si la configuración de red vive en `/etc` o se genera en cada arranque: con un `/etc/netplan/50-cloud-init.yaml` completo, netplan la lee aunque cloud-init esté desactivado y el riesgo desaparece. La sección 5.5 cubre esa verificación.
-
-Retirar `NOPASSWD` del usuario administrativo activa dos mecanismos que hasta entonces estaban dormidos:
-
-- `pam_faillock` pasa a aplicarse a sudo. Con `silent`, un bloqueo se ve igual que una contraseña incorrecta y dura `unlock_time` (10 minutos con la configuración de 7.3.3). El acceso SSH por llave no se ve afectado, porque no pasa por la autenticación de PAM; lo que queda bloqueado es la escalada con sudo.
-- La contraseña del usuario pasa a ser la llave de sudo, y la política de 7.4 la hace vencer a los 90 días. Conviene anotar la fecha de vencimiento (`sudo chage -l "${MIUSUARIO:?}"`) para que el cambio obligatorio no llegue en medio de una intervención.
-
-#### 7.4 Política de contraseñas
-
-Debian trae valores por defecto razonables. Reforzarlos editando `/etc/login.defs`:
+**Opcional, recomendado.** Con SSH solo por llave, las contraseñas protegen sobre todo `sudo`.
 
 ```bash
 sudoedit /etc/login.defs
 ```
 
-Valores recomendados:
+Valores:
 
-```
+```text
 PASS_MAX_DAYS   90
 PASS_MIN_DAYS   1
 PASS_MIN_LEN    12
 PASS_WARN_AGE   14
+UMASK           027
 ```
 
-> **Nota:** `PASS_MIN_LEN` en `login.defs` es **ignorado** cuando `pam_pwquality` está activo (que es el caso tras instalar `libpam-pwquality` en el siguiente paso). El mínimo efectivo lo determina el parámetro `minlen` de `pam_pwquality`, no esta directiva. `PASS_MIN_LEN` solo aplica si PAM no usa pwquality, lo que no es el caso en este servidor. Se mantiene el valor por coherencia y como fallback, pero el control real está en `pam_pwquality`.
+`UMASK` no viene en el `login.defs` de Debian 13 y se añade. La aplica `pam_umask` en cada sesión: sin ella vale 022 y los archivos nuevos son legibles por cualquiera. Con `USERGROUPS_ENAB yes`, los bits de grupo se igualan a los del propietario en usuarios con grupo privado, así que la máscara efectiva es 007; lo que importa es que el resto de usuarios queda sin acceso. Responde a AUTH-9328 de lynis (14.5) y rige desde el siguiente inicio de sesión.
 
-Estos valores afectan a usuarios creados después del cambio. Para aplicar la política al usuario actual:
+También alcanza a lo creado con `sudo`, que combina su 022 con la de la sesión: `sudo mkdir` deja 0750 y `sudo tee` 0640. Los servicios que corren como root no lo notan, pero las herramientas que corren como usuario dejan de leer esos archivos sin avisar (`systemd-analyze cat-config` omite un drop-in ilegible). Por eso, desde aquí, los archivos bajo `/etc` se crean con `install` y permisos explícitos.
+
+> **Nota:** con `pam_pwquality` activo, `PASS_MIN_LEN` se ignora y el mínimo es `minlen`. Se mantiene como respaldo.
+
+Para aplicar la política al usuario actual:
 
 ```bash
 sudo chage -M 90 -m 1 -W 14 "${MIUSUARIO:?}"
 sudo chage -l "${MIUSUARIO:?}"
 ```
 
-Instalar `libpam-pwquality` para exigir contraseñas robustas:
+Contraseñas robustas con `libpam-pwquality`:
 
 ```bash
 sudo apt install -y libpam-pwquality
 ```
 
-Editar `/etc/pam.d/common-password`. Buscar la línea que contiene `pam_pwquality.so` y ajustarla (o añadir si no existe) para requerir complejidad razonable:
+> **ATENCIÓN.** Su postinst ejecuta `pam-auth-update` y puede deshacer la pila de faillock: en el VPS observado, la contraseña correcta dejaba entrar a una cuenta bloqueada. Justo después se aplica la comprobación de la ATENCIÓN de 9.3.3.
 
-```
-password requisite pam_pwquality.so retry=3 minlen=12 difok=3 ucredit=-1 lcredit=-1 dcredit=-1 ocredit=-1 reject_username enforce_for_root
-```
-
-Significado de los parámetros:
-
-- `minlen=12` — mínimo 12 caracteres (este es el valor efectivo, no el de `login.defs`).
-- `difok=3` — al menos 3 caracteres distintos respecto a la contraseña anterior.
-- `ucredit=-1` `lcredit=-1` `dcredit=-1` `ocredit=-1` — al menos una mayúscula, una minúscula, un dígito y un símbolo.
-- `reject_username` — rechaza contraseñas que contengan el nombre de usuario.
-- `enforce_for_root` — aplica la política también a root.
-
-#### 7.5 Creación de usuarios adicionales (si aplica)
-
-Para un servidor administrado por una sola persona, normalmente basta con el usuario creado durante la instalación. Si hay más administradores:
+El paquete añade `pam_pwquality.so retry=3` a `common-password`, dentro del bloque gestionado, donde cualquier parámetro se perdería. La política va en `/etc/security/pwquality.conf`, que `pam-auth-update` no toca:
 
 ```bash
-sudo adduser <nuevo_usuario>
-sudo usermod -aG sudo,adm <nuevo_usuario>
+[ -e /etc/security/pwquality.conf.ori ] || sudo cp /etc/security/pwquality.conf /etc/security/pwquality.conf.ori
+grep -q '^# Política del manual' /etc/security/pwquality.conf \
+  || sudo tee -a /etc/security/pwquality.conf > /dev/null <<'EOF'
+
+# Política del manual, sección 9.4
+minlen = 12
+difok = 3
+ucredit = -1
+lcredit = -1
+dcredit = -1
+ocredit = -1
+usercheck = 1
+enforce_for_root
+EOF
 ```
 
-`adduser` (frontend de `useradd`) gestiona automáticamente el home, el shell, el grupo primario y solicita contraseña.
+El respaldo y el bloque solo se escriben la primera vez, así que repetir la orden no duplica nada. `minlen = 12` es el mínimo efectivo; `difok = 3`, caracteres distintos de la anterior; los `*credit = -1` exigen mayúscula, minúscula, dígito y símbolo; `usercheck = 1` rechaza el nombre de usuario; `enforce_for_root` aplica la política también a root. La línea de `common-password` debe seguir siendo la del paquete:
 
-#### 7.6 Bloqueo de la cuenta de root
+```bash
+grep -vE '^\s*#|^\s*$' /etc/pam.d/common-password
+```
 
-Llegados a este punto, el usuario administrativo tiene `sudo` funcional, acceso SSH por llave verificado, y la sesión activa confirmada. Se puede bloquear root con seguridad.
+```text
+password    requisite            pam_pwquality.so retry=3
+password    [success=1 default=ignore]    pam_unix.so obscure use_authtok try_first_pass yescrypt
+password    requisite            pam_deny.so
+password    required            pam_permit.so
+```
 
-Bloquear la contraseña de root (deshabilita login por contraseña pero mantiene la cuenta operativa para procesos internos):
+Se prueba con `passwd`: una contraseña corta debe rechazarse tras pedir la actual.
+
+#### 9.5 Creación de usuarios adicionales (si aplica)
+
+Solo si hay más administradores:
+
+```bash
+export NUEVO_USUARIO=nombre
+sudo adduser "${NUEVO_USUARIO:?}"
+sudo usermod -aG sudo,adm "${NUEVO_USUARIO:?}"
+```
+
+#### 9.6 Bloqueo de la cuenta de root
+
+Con `sudo` funcionando, la llave SSH verificada y la sesión confirmada, root se puede bloquear. La cuenta sigue operativa para los procesos del sistema:
 
 ```bash
 sudo passwd -l root
 ```
-
-Verificar:
 
 ```bash
 sudo passwd -S root
 # Debe mostrar:  root L <fecha> ...   (L = locked)
 ```
 
-Consecuencias del bloqueo:
-
-- `su -` ya no funciona pidiendo contraseña de root. Sigue funcionando como `sudo su -` o `sudo -i`.
-- No se puede iniciar sesión como root por consola ni por SSH (SSH además debe tener `PermitRootLogin no`, que se aplica en la Etapa III).
-- Procesos del sistema que necesitan ejecutarse como root siguen funcionando sin cambios (cron, systemd, etc.).
-
-Si se quiere recuperar el acceso a root más adelante:
+`su -` deja de funcionar con la contraseña de root, pero `sudo -i` sigue disponible; root no inicia sesión por consola ni por SSH (`PermitRootLogin no`, sección 10), y cron y systemd siguen igual. Para recuperarla, sin conocer la contraseña anterior:
 
 ```bash
 sudo passwd root
 ```
 
-Esto establece una contraseña nueva y desbloquea la cuenta. No requiere conocer la anterior.
-
 ---
 
 ## Etapa III — Hardening
 
-Las partes I y II dejaron el servidor instalado, identificable, accesible por SSH con llave pública, actualizado y con un usuario administrativo definido. Esta parte lo endurece: reduce la superficie de ataque, dificulta los abusos cuando un atacante ya tiene un punto de apoyo, y deja huellas de auditoría útiles para un análisis forense posterior.
+Reduce la superficie de ataque, dificulta el abuso de un punto de apoyo y deja rastro para el análisis forense. Es el mínimo razonable para cualquier servidor expuesto; cada rol añade sus capas en su manual. Tres reglas atraviesan la etapa: la sesión de rescate (6.4) sigue abierta antes de tocar SSH, firewall o red; los cambios van en archivos propios dentro de directorios `*.d/`, que se revierten borrando un archivo y sobreviven a las actualizaciones; y se valida antes de aplicar (`sshd -t`, `ufw show added`, `unattended-upgrades --dry-run`).
 
-El hardening que se cubre aquí es generalista — el mínimo razonable para cualquier servidor Debian 13 expuesto a una red. Roles específicos (servidor web, base de datos, mail, etc.) añaden capas adicionales que se documentan en sus respectivos manuales.
+### 10. Hardening de SSH
 
-Tres principios atraviesan toda esta parte:
+SSH es la puerta principal: si cae, ninguna otra medida importa. La sección cambia el puerto, quita las contraseñas, restringe usuarios, acota sesiones, recorta la criptografía y recarga sin perder la sesión.
 
-1. Mantener una sesión de rescate abierta en paralelo. Cualquiera de los cambios de esta parte puede dejar el servidor inaccesible si se aplica mal. La sesión de rescate (sección 4.4) y el `tmux` persistente son la red de seguridad. Antes de cada modificación que toca SSH, firewall o red, confirmar que la sesión paralela sigue viva.
+#### 10.1 Archivo modular `/etc/ssh/sshd_config.d/01-hardening.conf`
 
-2. Cambio modular, no edición de archivos canónicos. Donde sea posible, los cambios van en archivos `*.conf` dentro de directorios `*.d/` (`/etc/ssh/sshd_config.d/`, `/etc/sysctl.d/`, `/etc/sudoers.d/`). Esto preserva los archivos originales del paquete, facilita los upgrades futuros, y permite revertir un cambio borrando un solo archivo.
-
-3. Probar antes de aplicar. Cada herramienta clave tiene un modo de validación (`sshd -t`, `ufw --dry-run`, `unattended-upgrades --dry-run`). Usarlo siempre antes de recargar o activar.
-
-### 8. Hardening de SSH
-
-SSH es la puerta principal del servidor. Su endurecimiento es la primera prioridad porque cualquier otra medida (firewall, fail2ban, sysctl) cae si SSH está mal configurado y un atacante consigue una sesión.
-
-El objetivo de esta sección es:
-
-- Cambiar el puerto por defecto.
-- Deshabilitar autenticación por contraseña.
-- Restringir qué usuarios pueden entrar.
-- Acotar tiempos y sesiones.
-- Limitar los algoritmos criptográficos a opciones modernas.
-- Validar y recargar sin perder la sesión activa.
-
-#### 8.1 Archivo modular `/etc/ssh/sshd_config.d/01-hardening.conf`
-
-Desde OpenSSH 8.2 (Debian 11 en adelante), `/etc/ssh/sshd_config` incluye al inicio una directiva `Include /etc/ssh/sshd_config.d/*.conf`. Las directivas declaradas en archivos de ese directorio se aplican antes que las del archivo principal, y las primeras ocurrencias ganan. Esto significa que un archivo en `sshd_config.d/` con prefijo numérico bajo (`99-`) toma precedencia sobre el `sshd_config` original sin modificarlo.
-
-Ventaja práctica: en una actualización mayor, el `sshd_config` lo reemplaza el paquete sin conflicto. El hardening propio queda intacto en su archivo separado.
+Desde OpenSSH 8.2 (Debian 11), `sshd_config` empieza con `Include /etc/ssh/sshd_config.d/*.conf`. Los archivos de ese directorio se leen en orden y antes que el principal, y gana la primera aparición de cada directiva: `01-hardening.conf` prevalece sobre `sshd_config` y sobre cualquier drop-in con número mayor, y el archivo del paquete queda intacto para las actualizaciones.
 
 ```bash
 # Definir las variables
 export MIPUERTO=17177
-export MIUSUARIO=usuario # Ya se definió en 3.2.2
+export MIUSUARIO=usuario # Definido en 4.2.2 o 4.2.4
 
-# Descargar y aplicar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar y aplicar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §3.1.1)
 : "${ASSETS_BASE:?}" "${MIPUERTO:?}" "${MIUSUARIO:?}" && \
 id "${MIUSUARIO}" > /dev/null && \
 wget "${ASSETS_BASE}/plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt" \
@@ -1830,52 +1827,35 @@ wget "${ASSETS_BASE}/plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt" \
 sed -e "s|\$MIPUERTO|${MIPUERTO}|g" \
     -e "s|\$MIUSUARIO|${MIUSUARIO}|g" \
     /tmp/plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt \
-    | sudo tee /etc/ssh/sshd_config.d/01-hardening.conf > /dev/null
-
-# Permisos correctos (recomendado para sshd_config.d)
-sudo chmod 600 /etc/ssh/sshd_config.d/01-hardening.conf
-sudo chown root:root /etc/ssh/sshd_config.d/01-hardening.conf
+    | sudo install -m 0600 -o root -g root /dev/stdin /etc/ssh/sshd_config.d/01-hardening.conf
 ```
 
-El `id` de la cadena es la guarda más importante de esta sección. La plantilla escribe `AllowUsers ${MIUSUARIO}` (8.3): con un nombre de usuario mal escrito, el archivo es sintácticamente válido, `sshd -t` lo acepta, y tras recargar SSH nadie puede entrar.
-
-Comprobar los valores efectivos y que no quedó ningún marcador sin sustituir:
+El `id` de la cadena es la guarda importante: la plantilla escribe `AllowUsers ${MIUSUARIO}` (10.3), y con un nombre mal escrito `sshd -t` acepta el archivo y tras recargar no entra nadie.
 
 ```bash
 sudo grep -nE '^(Port|AllowUsers)' /etc/ssh/sshd_config.d/01-hardening.conf
 sudo grep -n '\$MI[A-Z_]*' /etc/ssh/sshd_config.d/01-hardening.conf || echo "✓ plantilla aplicada"
 ```
 
-Una comprobación rápida de que el archivo se parsea sin errores:
-
 ```bash
 sudo sshd -t && echo "✓ sintaxis válida"
 ```
 
-#### 8.2 Cambio de puerto, password auth y solo pubkey
+#### 10.2 Cambio de puerto, password auth y solo pubkey
 
-**Puerto.** Cambiar el puerto por defecto (22) a uno alto (17177) reduce drásticamente el ruido de los escáneres automáticos. No es seguridad real (un escaneo dirigido encuentra el puerto en segundos), pero corta el 99% de los intentos de fuerza bruta automatizados, lo cual reduce el volumen de logs y libera CPU. Es un cambio gratuito con un efecto medible.
-
-Si el servidor está detrás de un firewall corporativo o un proveedor de nube con grupos de seguridad, es mandatorio abrir el nuevo puerto en ambos lados antes de reiniciar SSH.
-
-Antes de aplicar:
-
-- Abrir puerto en:
-  - Firewall del proveedor
-  - Security groups
-  - Router/NAT
-
-Validar:
+**Puerto.** Un puerto alto (17177) no es seguridad real, porque un escaneo dirigido lo encuentra, pero corta casi todo el ruido automatizado. Antes de recargar SSH, el puerto nuevo se abre en el firewall del proveedor (11.6) y en el router o NAT si los hay. Se comprueba desde el equipo del administrador, que no tiene las variables del servidor:
 
 ```bash
-nc -zv <ip> <nuevo_puerto>
+IP_SERVIDOR="203.0.113.10"   # IP pública del servidor
+MIHOST=villonaco             # el mismo nombre corto de 7.1
+MIPUERTO=17177
+MIUSUARIO=usuario
+nc -zv "${IP_SERVIDOR:?}" "${MIPUERTO:?}"
 ```
 
-**Password auth deshabilitado.** Solo se acepta autenticación por llave pública. La sesión paralela del paso 4.4 ya está abierta con llave funcional, así que apagar `PasswordAuthentication` no rompe nada. Si la llave aún no se ha probado, **no aplicar este cambio todavía**: volver al paso 4.3.
+Antes de la recarga de 10.6 la respuesta esperada es `Connection refused`: los paquetes llegan y nada escucha todavía. Si agota el tiempo, algún firewall del camino lo cierra (11.6.3).
 
-**`KbdInteractiveAuthentication no`.** Esta es la directiva que cierra la puerta de atrás. Con `UsePAM yes`, PAM puede autenticar por la vía keyboard-interactive, que cumple un papel equivalente al de la contraseña: el usuario ve un prompt y escribe su clave igual que antes. Apagar `PasswordAuthentication` no basta, porque ese prompt llega por otro método de autenticación del protocolo. La propia documentación de `UsePAM` recomienda desactivar una de las dos, y en un servidor que solo acepta llave se desactivan ambas.
-
-Comprobar que el resultado efectivo es el correcto, que es lo único que importa:
+**Sin contraseñas.** Solo se acepta llave pública. Si la llave no se probó en 6.3, **no se aplica todavía**. `KbdInteractiveAuthentication no` es imprescindible: con `UsePAM yes`, PAM puede pedir la contraseña por el método keyboard-interactive aunque `PasswordAuthentication` esté apagado. `UsePAM yes` se mantiene para la gestión de sesión.
 
 ```bash
 # Configuración efectiva tras fusionar sshd_config con todo sshd_config.d/
@@ -1884,46 +1864,41 @@ sudo sshd -T | grep -Ei "^(passwordauthentication|kbdinteractiveauthentication|u
 
 Salida esperada:
 
-```
+```text
 passwordauthentication no
 kbdinteractiveauthentication no
 pubkeyauthentication yes
 usepam yes
 ```
 
-Para comprobar desde el cliente que el servidor ya no ofrece métodos basados en contraseña, sin llegar a autenticarse:
+Desde el cliente, sin llegar a autenticarse:
 
 ```bash
-# Desde la estación del administrador. Debe responder que solo acepta publickey.
-ssh -p $MIPUERTO -o PreferredAuthentications=password \
-    -o PubkeyAuthentication=no $MIUSUARIO@<ip.del.servidor>
+# Desde la estación del administrador, con las variables declaradas arriba.
+# Debe responder que solo acepta publickey.
+ssh -p "${MIPUERTO:?}" -o PreferredAuthentications=password \
+    -o PubkeyAuthentication=no "${MIUSUARIO:?}@${IP_SERVIDOR:?}"
 ```
 
-El servidor debe rechazar con `Permission denied (publickey)`. Si en cambio
-aparece un prompt de contraseña, alguna de las dos directivas no está surtiendo
-efecto y hay que volver al `sshd -T` de arriba antes de seguir.
+Debe responder `Permission denied (publickey)`. Si sale un prompt de contraseña, alguna directiva no surte efecto.
 
-**`UsePAM yes` se mantiene.** PAM se sigue usando para gestión de sesión (límites, cuotas, mensajes de login), no para autenticación.
+#### 10.3 Restricción de usuarios (`AllowUsers`)
 
-#### 8.3 Restricción de usuarios (`AllowUsers`)
+Lista blanca: solo esos usuarios entran por SSH, aunque otra cuenta tenga una llave instalada por error.
 
-`AllowUsers` es una lista blanca: solo los usuarios listados pueden iniciar sesión por SSH, sin importar que la llave esté instalada en otra cuenta. Esto previene escenarios donde un usuario del sistema sin shell (creado por algún paquete) tenga llave SSH configurada por error.
-
-```
+```text
 AllowUsers $MIUSUARIO
 ```
 
 Para varios administradores:
 
-```
+```text
 AllowUsers <usuario1> <usuario2>
 ```
 
-`AllowUsers` también acepta restricción por origen: `AllowUsers usuario2@192.168.1.0/24` permite a `usuario2` solo desde esa red. Útil cuando se sabe desde dónde se administra el servidor.
+Admite origen (`AllowUsers usuario2@192.168.1.0/24`). Con muchos usuarios, `AllowGroups` con un grupo como `ssh-admins` se mantiene mejor.
 
-`AllowGroups` es una alternativa más mantenible si hay muchos usuarios: se permite por pertenencia a un grupo, por ejemplo `ssh-admins`. Para servidores con uno o dos administradores, `AllowUsers` con nombres explícitos es más claro.
-
-#### 8.4 Límites de sesión y timeouts
+#### 10.4 Límites de sesión y timeouts
 
 | Directiva                 | Valor | Efecto                                                                       |
 |---------------------------|-------|------------------------------------------------------------------------------|
@@ -1933,32 +1908,58 @@ AllowUsers <usuario1> <usuario2>
 | `ClientAliveInterval 300` | 5 min | Cada 5 min envía un keepalive cifrado al cliente.                            |
 | `ClientAliveCountMax 2`   | 2     | Tras 2 keepalives sin respuesta (10 min), cierra la sesión.                  |
 
-`ClientAliveInterval` + `ClientAliveCountMax` cumplen dos propósitos: mantener la sesión viva contra firewalls que cortan conexiones inactivas, y desconectar sesiones zombies (atacante que abre conexión y la deja colgada).
+`MaxAuthTries 3` cuenta cada llave que el cliente ofrece y se rechaza. Un cliente con varias llaves las prueba en orden y, si la buena no está entre las tres primeras, recibe `Too many authentication failures`; esos rechazos cuentan además para fail2ban. Se fija la llave en el `~/.ssh/config` del equipo del administrador:
 
-El forwarding se desactiva por completo. En un servidor administrado por SSH plano no se usa, y cada tipo habilita un vector distinto: reenvío de puertos hacia servicios internos que el firewall no expone, túneles SOCKS que convierten al servidor en proxy de salida, reenvío del agente que permite saltar a otras máquinas con las llaves del administrador, y reenvío de sockets Unix.
+```bash
+[ -f ~/.ssh/config ] || install -m 600 /dev/null ~/.ssh/config
+grep -qx "Host ${MIHOST:?}" ~/.ssh/config || cat >> ~/.ssh/config <<EOF
 
-La plantilla v1.1 lo hace con una sola directiva, disponible desde OpenSSH 8.9:
-
+Host ${MIHOST:?}
+    HostName ${IP_SERVIDOR:?}
+    Port ${MIPUERTO:?}
+    User ${MIUSUARIO:?}
+    IdentityFile ~/.ssh/${MINOMBREDELLAVE:?}
+    IdentitiesOnly yes
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-%C
+    ControlPersist 10m
+EOF
+chmod 600 ~/.ssh/config
 ```
+
+Si el archivo no existe, se crea con modo 600; si ya tiene un `Host` con ese nombre, no se duplica y se revisa a mano. `IdentitiesOnly yes` limita el cliente a la llave de `IdentityFile`. Desde la recarga de 10.6, basta `ssh "${MIHOST}"`.
+
+> GNOME Keyring puede responder `agent refused operation` si no logra mostrar el diálogo de passphrase, y ssh no reintenta con el archivo. `IdentityAgent none` en el bloque lo evita.
+
+Las líneas `Control*` evitan el `limit` de UFW (11.3), que rechaza más de 6 conexiones en 30 segundos desde una misma IP, también las del administrador, y renueva la ventana con cada intento. Con `ControlMaster`, las conexiones siguientes viajan por la primera y no cuentan; `ControlPersist 10m` la mantiene diez minutos, y de paso las conexiones se abren al instante.
+
+```bash
+ssh -O check "${MIHOST}"
+ssh -O exit "${MIHOST}"
+```
+
+`ClientAliveInterval` y `ClientAliveCountMax` mantienen viva la sesión frente a firewalls que cortan las inactivas y cierran las abandonadas.
+
+El reenvío se desactiva por completo: de puertos hacia servicios internos, túneles SOCKS, agente y sockets Unix. Una sola directiva, desde OpenSSH 8.9:
+
+```text
 DisableForwarding yes
 ```
 
-Reemplaza a `X11Forwarding`, `AllowAgentForwarding`, `AllowTcpForwarding`, `AllowStreamLocalForwarding` y `PermitTunnel`. La ventaja no es solo la concisión: según la documentación de `sshd_config`, esta opción prevalece sobre todas las demás opciones relacionadas con forwarding, de modo que ninguna reactivación posterior —en otro drop-in, en un `Match`, o por error— puede abrir un tipo de reenvío sin que se retire primero esta línea.
+Sustituye a `X11Forwarding`, `AllowAgentForwarding`, `AllowTcpForwarding`, `AllowStreamLocalForwarding` y `PermitTunnel`, y según `sshd_config(5)` prevalece sobre todas ellas, así que ningún drop-in ni `Match` posterior reabre un reenvío.
 
-> **Consecuencia operativa que conviene conocer de antemano.** Con esta directiva el servidor deja de servir como salto: `ssh -J` y `ProxyJump` dejan de funcionar contra él, porque el salto se implementa como un reenvío TCP. Tampoco funcionan `ssh -L`, `ssh -R` ni `ssh -D`. Si el rol del servidor contempla alguno de esos usos, hay que decidirlo aquí y no descubrirlo el día que haga falta.
+> **Consecuencia operativa.** El servidor deja de servir de salto (`ssh -J`, `ProxyJump`) y no funcionan `ssh -L`, `-R` ni `-D`. Si el rol lo necesita, se decide aquí.
 
-Si un usuario concreto necesita forwarding, no basta con permitírselo en un `Match`: como `DisableForwarding` prevalece sobre las demás opciones, hay que desactivarlo dentro del bloque y recién entonces conceder el tipo puntual. Ambas directivas están permitidas dentro de `Match`:
+Para conceder un reenvío puntual, dentro del `Match` hay que desactivar `DisableForwarding` y luego permitir el tipo concreto:
 
-```
+```text
 Match User operador-tuneles
     DisableForwarding no
     AllowTcpForwarding local
     PermitOpen 10.0.0.5:5432
 ```
 
-`AllowTcpForwarding local` concede solo el reenvío de salida (`ssh -L`), no el de entrada, y `PermitOpen` acota el destino a un único host y puerto. Conceder `AllowTcpForwarding yes` a secas equivale a entregar un proxy de propósito general.
-
-Verificar que la política quedó como se pretende, incluida la excepción:
+`AllowTcpForwarding local` concede solo `ssh -L`, y `PermitOpen` acota el destino; `yes` a secas sería un proxy de propósito general.
 
 ```bash
 sudo sshd -T | grep -Ei "^(disableforwarding|allowtcpforwarding|x11forwarding|permittunnel)"
@@ -1968,129 +1969,109 @@ sudo sshd -T -C user=operador-tuneles,host=localhost,addr=127.0.0.1 \
     | grep -Ei "^(disableforwarding|allowtcpforwarding|permitopen)"
 ```
 
-La opción `-C` de `sshd -T` simula una conexión con esos parámetros y aplica los `Match` correspondientes. Es la única forma de comprobar un bloque condicional sin pedirle al usuario que se conecte.
+`-C` simula una conexión y aplica los `Match`. Con la plantilla tal cual, la primera orden da:
 
-> **OpenSSH 10.0 en Trixie trae penalizaciones por origen activas por defecto.** La opción `PerSourcePenalties` rechaza durante un tiempo las conexiones de una dirección que provoque fallos de autenticación, desconexiones sin autenticar o agotamiento de `LoginGraceTime`. Es una capa parecida a la de fail2ban (sección 10) pero interna a `sshd`, con memoria de corta duración y sin persistencia entre reinicios. No sustituye a fail2ban, que banea a nivel de firewall y por más tiempo, pero explica por qué durante una prueba de fuerza bruta pueden aparecer rechazos antes de que fail2ban haya contado los intentos. Consultar la política vigente con `sudo sshd -T | grep -i persource`.
+```text
+x11forwarding yes
+allowtcpforwarding yes
+disableforwarding yes
+permittunnel no
+```
 
-#### 8.5 Algoritmos criptográficos modernos
+`x11forwarding yes` y `allowtcpforwarding yes` no indican nada: `sshd -T` informa de cada opción por separado y `disableforwarding yes` prevalece sobre ambas. La segunda orden solo prueba algo si se añadió el `Match` del ejemplo.
 
-OpenSSH soporta algoritmos legacy por compatibilidad (3DES, SHA1, RSA-SHA1, grupos DH débiles). En un servidor moderno donde los clientes son administrados, se puede recortar la lista a algoritmos de calidad actual. Beneficio: cierra ataques de downgrade y reduce superficie criptográfica.
+> **PerSourcePenalties.** OpenSSH 10.0 rechaza durante un tiempo las conexiones de una dirección que acumula fallos o desconexiones sin autenticar. Es una capa interna de `sshd`, de memoria corta, que no sustituye a fail2ban (sección 12) pero explica rechazos antes de que fail2ban cuente nada. Se consulta con `sudo sshd -T | grep -i persource`.
+
+#### 10.5 Algoritmos criptográficos modernos
+
+**Opcional, recomendado.** OpenSSH 10 ya negocia algoritmos modernos por defecto; recortar la lista cierra los ataques de downgrade cuando todos los clientes son conocidos.
 
 **Key exchange (`KexAlgorithms`).**
 
-```
-KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,sntrup761x25519-sha512@openssh.com
+```text
+KexAlgorithms mlkem768x25519-sha256,curve25519-sha256,curve25519-sha256@libssh.org,sntrup761x25519-sha512@openssh.com
 ```
 
-- `curve25519-sha256` — el estándar moderno, presente en todos los OpenSSH recientes.
-- `sntrup761x25519-sha512@openssh.com` — híbrido post-cuántico, default desde OpenSSH 9.0. Protege contra "harvest now, decrypt later".
+- `mlkem768x25519-sha256`: híbrido post-cuántico (ML-KEM con X25519), el valor por defecto desde OpenSSH 10.0; va primero.
+- `curve25519-sha256`: clásico, para clientes anteriores a 9.0.
+- `sntrup761x25519-sha512@openssh.com`: el híbrido anterior, por defecto entre 9.0 y 9.9. Los dos híbridos protegen frente a "harvest now, decrypt later".
 
-**Cifradores (`Ciphers`).**
+Desde el equipo del administrador:
 
+```bash
+ssh -v "${MIHOST:?}" true 2>&1 | grep 'kex: algorithm'
 ```
+
+Con un cliente OpenSSH 10.0:
+
+```text
+debug1: kex: algorithm: mlkem768x25519-sha256
+```
+
+**Cifradores (`Ciphers`).** Solo AEAD; fuera CBC y CTR.
+
+```text
 Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
 ```
 
-Solo AEAD modernos. Se excluyen explícitamente CBC y CTR.
+**MACs.** Solo Encrypt-then-MAC con SHA-2.
 
-**MACs.**
-
-```
+```text
 MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
 ```
 
-Solo Encrypt-then-MAC con SHA-2. SHA-1 queda fuera.
+**Algoritmos de host key (`HostKeyAlgorithms`).** Sin `ssh-rsa` (RSA con SHA-1), que solo afecta a clientes muy antiguos.
 
-**Algoritmos de host key (`HostKeyAlgorithms`).**
-
-```
+```text
 HostKeyAlgorithms ssh-ed25519,rsa-sha2-512,rsa-sha2-256
 ```
 
-Excluye `ssh-rsa` (firmas RSA con SHA-1). En clientes muy antiguos puede causar incompatibilidad. Si el operador llega desde una estación reciente, no hay problema.
+> Antes de recargar, desde el cliente: `ssh -Q kex`, `ssh -Q cipher` y `ssh -Q mac` deben incluir al menos un algoritmo de cada lista.
 
-> Para validar que la combinación es compatible con el cliente desde el que se administra, antes de recargar SSH ejecutar desde el cliente: `ssh -Q kex`, `ssh -Q cipher`, `ssh -Q mac`. Las listas devueltas deben incluir al menos uno de cada categoría configurada en el servidor.
+#### 10.6 Validación y recarga segura
 
-#### 8.6 Validación y recarga segura
-
-**Antes de tocar nada en producción:**
-
-1. La sesión paralela del paso 4.4 sigue conectada.
-2. La llave del administrador está probada y en `~/.ssh/authorized_keys`.
-3. Se conoce la IP del servidor y el puerto nuevo.
-
-**Validar la sintaxis del archivo:**
+Antes de recargar: la sesión paralela (6.4) sigue conectada, la llave está probada y se conocen la IP y el puerto nuevo.
 
 ```bash
 sudo sshd -t
 ```
 
-Si no hay salida, la configuración es sintácticamente correcta. Si hay errores, no recargar — corregir primero.
-
-**Recarga sin cortar sesiones existentes:**
+Sin salida, la sintaxis es correcta. Con errores, no se recarga.
 
 ```bash
 sudo systemctl reload ssh
 ```
 
-`reload` (a diferencia de `restart`) no termina las conexiones SSH activas. La sesión actual sigue viva con la configuración antigua, y las nuevas conexiones usan la configuración nueva.
-
-**Probar el acceso desde otra ventana antes de cerrar la sesión actual:**
+`reload` no corta las sesiones abiertas, que siguen con la configuración anterior. Desde otra ventana:
 
 ```bash
-ssh -p $MIPUERTO $MIUSUARIO@<ip.del.servidor>
+ssh "${MIHOST:?}"
 ```
 
-Solo cuando la conexión nueva funciona, se puede cerrar la sesión antigua con tranquilidad.
+`MIHOST` es el alias del bloque `Host` de 10.4. Solo cuando la conexión nueva funciona se cierra la antigua.
 
-> Si la conexión nueva falla, **no cerrar la sesión antigua**. Diagnosticar desde ahí: `journalctl -u ssh -n 50`, `sudo sshd -T | grep -E 'port|allowusers|passwordauthentication'` (muestra la configuración efectiva), `sudo ss -tlnp | grep ssh` (¿está escuchando en el puerto correcto?).
+> Si falla, **no se cierra la sesión antigua**. Desde ella: `journalctl -u ssh -n 50`, `sudo sshd -T | grep -E 'port|allowusers|passwordauthentication'` y `sudo ss -tlnp | grep ssh`.
 
-**Revisión final.** `sshd -T` muestra la configuración efectiva tras fusionar el archivo principal con los drop-ins, que es lo único que vale:
+La configuración efectiva, tras fusionar los drop-ins:
 
 ```bash
 sudo sshd -T | grep -Ei \
   "^(port|permitrootlogin|passwordauthentication|kbdinteractiveauthentication|allowusers|maxauthtries|logingracetime|disableforwarding|kexalgorithms|ciphers|macs)"
 ```
 
-Una directiva con el valor por defecto en lugar del configurado significa que el archivo no se lee, que otro drop-in la fijó antes, o que el nombre está mal escrito.
+Un valor por defecto donde debería estar el configurado indica que el archivo no se lee, que otro drop-in lo fijó antes o que la directiva está mal escrita.
 
-**Actualizar `~/.ssh/config` del administrador** para no escribir el puerto cada vez:
+### 11. Firewall (UFW)
 
-```
-# En el cliente, en ~/.ssh/config
-Host miservidor
-    HostName <ip.o.dns.del.servidor>
-    Port $MIPUERTO
-    User $MIUSUARIO
-    IdentityFile ~/.ssh/<llave>
-    IdentitiesOnly yes
-```
+UFW genera reglas de `iptables`, que en Debian 13 es `iptables-nft`: el kernel las aplica como nftables y aparecen en `nft list ruleset`. Basta para un servidor con pocos puertos; NAT, balanceo o reglas por interfaz piden `nftables` directo. Se deniega todo lo entrante salvo lo necesario, se permite lo saliente (restringirlo rompe DNS, NTP y repositorios a cambio de poco) y se filtra IPv6, porque apagarlo en UFW no lo apaga en el sistema, solo lo deja sin firewall. `ufw enable` va al final, con todas las reglas revisadas. En la nube, el firewall del proveedor (11.6) se abre a la vez y con las mismas reglas.
 
-A partir de ese momento, `ssh miservidor` reemplaza a `ssh -p $MIPUERTO $MIUSUARIO@<ip.del.servidor>`.
-
-> GNOME Keyring anuncia las claves de `~/.ssh/*.pub` y puede responder `agent refused operation` si no logra mostrar el diálogo de passphrase. Aunque el bloque indique `IdentityFile`, ssh le pide la firma al agente y no vuelve a intentar con el archivo; `IdentityAgent none` lo evita.
-
-### 9. Firewall (UFW)
-
-UFW (Uncomplicated Firewall) es un frontend de `nftables` (en Debian 13; antes era `iptables`) pensado para configuraciones de servidor sencillas. No reemplaza a `nftables` directamente para escenarios complejos (NAT, balanceo, reglas por interfaz), pero para un servidor base con unos pocos puertos abiertos es la opción más manejable.
-
-La filosofía es:
-
-- Denegar por defecto el tráfico entrante. Solo se abre lo estrictamente necesario.
-- Permitir todo el tráfico saliente. Restringirlo es posible, pero rompe demasiadas cosas (DNS, NTP, repositorios) y se gana poco. Mantenerlo abierto es la práctica estándar en servidores que no son endpoints de red corporativa.
-- IPv6 activo si la red lo soporta. Apagar IPv6 en UFW no apaga IPv6 en el sistema, solo lo deja sin firewall.
-
-El firewall se configura antes de activarlo. Activarlo con reglas incorrectas puede cortar la sesión SSH y el servidor queda inaccesible. Por eso esta sección termina con `ufw enable` solo cuando todas las reglas están listas y verificadas.
-
-En un servidor en la nube, UFW no es el único firewall: el del proveedor filtra antes y con sus propias reglas. Las dos capas se mantienen con el mismo contenido, y la del proveedor se documenta en el Anexo C. Conviene leerlo ahora, porque el puerto de SSH que se abre en 9.3 tiene que abrirse también allí.
-
-#### 9.1 Instalación y políticas por defecto
+#### 11.1 Instalación y políticas por defecto
 
 ```bash
 sudo apt install -y ufw
 ```
 
-UFW viene desactivado tras instalarse. Hay tiempo para configurarlo sin riesgo.
+UFW queda desactivado tras instalarse.
 
 ```bash
 sudo ufw default deny incoming
@@ -2098,43 +2079,41 @@ sudo ufw default allow outgoing
 sudo ufw default deny routed
 ```
 
-`deny routed` solo importa si el servidor actúa como router (forwarding habilitado). En un servidor estándar es buena práctica dejarlo en `deny`: si en el futuro se habilita IP forwarding por algún motivo, este default impide que se convierta en router abierto por accidente.
+`deny routed` impide que el servidor se convierta en router abierto si algún día se activa el reenvío.
 
-#### 9.2 IPv6 (`/etc/default/ufw`)
-
-Verificar que UFW gestiona IPv6:
+#### 11.2 IPv6 (`/etc/default/ufw`)
 
 ```bash
 sudoedit /etc/default/ufw
 ```
 
-La línea relevante debe estar en:
+Debe estar:
 
-```
+```text
 IPV6=yes
 ```
 
-Es el valor por defecto en Debian 13, pero conviene confirmarlo. Si se deja en `no` y la interfaz tiene IPv6 activo, el tráfico IPv6 entrante no es filtrado por UFW (queda gobernado por las cadenas raw de nftables).
+Es el valor de Debian 13. Con `no` y una interfaz con IPv6, el tráfico IPv6 entrante queda sin filtrar por UFW.
 
-#### 9.3 Apertura selectiva de puertos según rol
+#### 11.3 Apertura selectiva de puertos según rol
 
-**SSH con rate limiting.** El puerto SSH (17177 según la sección 8) se abre con `limit` en lugar de `allow`. Esto activa una regla integrada en UFW que rechaza conexiones desde una misma IP si superan 6 intentos en 30 segundos:
+**SSH con `limit`.** Rechaza a una misma IP que supere 6 conexiones en 30 segundos:
 
 ```bash
-export MIPUERTO=17177 # Definido en 8.1
+export MIPUERTO=17177 # Definido en 10.1
 sudo ufw limit ${MIPUERTO}/tcp comment 'SSH endurecido con rate limit'
 ```
 
-`ufw limit` no reemplaza a fail2ban (sección 10): el rate limit de UFW es de grano fino y temporal; fail2ban banea por minutos u horas con base en patrones de log. Se complementan.
+Complementa a fail2ban (sección 12), que banea por patrones de log durante más tiempo.
 
-**Servicios web (cuando aplique).** Si el servicio se va a publicar detrás de un proxy de borde o CDN, estas dos órdenes no se ejecutan. Los puertos se abren ya restringidos a los rangos del borde según 9.6, y así nunca llegan a estar abiertos a todo internet. Si el servidor expone web público directamente, sin nada delante:
+**Servicios web.** Si el servicio irá detrás de un proxy de borde, estas órdenes no se ejecutan: los puertos se abren ya restringidos a los rangos del borde con la sección 17 del manual de Caddy. Si se publica directamente:
 
 ```bash
 sudo ufw allow 80/tcp  comment 'HTTP'
 sudo ufw allow 443/tcp comment 'HTTPS'
 ```
 
-**Reglas más restrictivas con origen específico.** Cuando se conoce desde dónde se administra:
+**Origen restringido**, cuando se sabe desde dónde se administra:
 
 ```bash
 # SSH solo desde una red administrativa
@@ -2144,9 +2123,9 @@ sudo ufw limit from 192.0.2.0/24 to any port ${MIPUERTO} proto tcp comment 'SSH 
 sudo ufw allow from 10.0.0.5 to any port 5432 proto tcp comment 'Postgres desde app'
 ```
 
-**No abrir lo que no se va a usar.** En el manual base solo se abre SSH. Los puertos de servicios concretos los abre el manual del rol cuando corresponda.
+En el manual base solo se abre SSH; el resto lo abre el manual del rol.
 
-**Filtrado de egreso (cuando el rol es conocido).** La política base `allow outgoing` es correcta para un servidor generalista. Cuando el rol del servidor está definido, restringir el tráfico saliente a lo estrictamente necesario reduce el impacto de un compromiso: un servidor web comprometido que no puede establecer conexiones salientes arbitrarias dificulta la exfiltración de datos y la comunicación con infraestructura de C2. Por ejemplo, un servidor que solo necesita acceder a repositorios Debian, servidores NTP y un relay SMTP puede restringirse a:
+**Filtrado de egreso.** **Opcional.** Con el rol definido, limitar la salida a lo necesario dificulta la exfiltración y el contacto con infraestructura de mando de un servidor comprometido. Por ejemplo, para repositorios, NTP y un relay SMTP:
 
 ```bash
 # Cambiar la política de egreso a deny y abrir solo lo necesario
@@ -2158,271 +2137,210 @@ sudo ufw allow out 123/udp comment 'NTP'
 sudo ufw allow out 587/tcp comment 'SMTP relay'
 ```
 
-Este nivel de control es opcional en el manual base y se documenta en los manuales de rol cuando aplica.
-
-#### 9.4 Inspección antes de activar
-
-Antes de `enable`, listar las reglas pendientes:
+#### 11.4 Inspección antes de activar
 
 ```bash
 sudo ufw show added
 ```
 
-Esto muestra las reglas que están registradas pero todavía no activas. Revisar que aparece la de SSH y que el puerto es el correcto. Si hay una regla mal escrita, eliminarla:
+Muestra las reglas registradas y aún inactivas; la de SSH debe tener el puerto correcto. Para borrar una mal escrita:
 
 ```bash
-sudo ufw delete <numero o regla literal>
+REGLA="allow 80/tcp"   # la regla tal como la muestra "ufw show added", sin "ufw"
+sudo ufw delete ${REGLA:?}
 ```
 
-#### 9.5 Activación final y verificación
+`REGLA` va sin comillas a propósito, para que `ufw` reciba cada palabra como un argumento.
+
+#### 11.5 Activación final y verificación
 
 ```bash
 sudo ufw enable
 sudo systemctl enable --now ufw
 ```
 
-UFW advierte: *"Command may disrupt existing ssh connections. Proceed with operation (y|n)?"*. Aquí es cuando importa que la regla de SSH esté correctamente configurada. Confirmar `y`.
-
-Inmediatamente, **desde otra ventana**, probar la conexión SSH al puerto nuevo. Si funciona, todo está bien. Si no funciona, la sesión paralela aún conectada permite recuperar:
+Ante *"Command may disrupt existing ssh connections"*, se confirma con `y` y se prueba **desde otra ventana** la conexión al puerto nuevo. Si falla, desde la sesión paralela:
 
 ```bash
 sudo ufw disable
 # Diagnosticar y volver a aplicar
 ```
 
-**Verificación del estado:**
-
 ```bash
 sudo ufw status verbose
 sudo ufw status numbered
 ```
 
-`numbered` es útil cuando hay que borrar una regla específica: `sudo ufw delete <n>`.
+`numbered` sirve para borrar una regla con `sudo ufw delete <n>`. Con solo SSH, `ufw status verbose` muestra:
 
-**Ver las reglas reales en nftables (para depuración avanzada):**
+```text
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), disabled (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+17177/tcp                  LIMIT IN    Anywhere                   # SSH endurecido con rate limit
+17177/tcp (v6)             LIMIT IN    Anywhere (v6)              # SSH endurecido con rate limit
+```
+
+`disabled (routed)` aparece mientras `ip_forward` vale `0`, porque no hay tráfico enrutado que filtrar; la política `deny` queda guardada en `/etc/default/ufw` (`DEFAULT_FORWARD_POLICY="DROP"`). Con reenvío activo debería pasar a `deny (routed)`, pendiente de comprobar.
+
+**Desde fuera**, desde el equipo del administrador con las variables de 10.2:
+
+```bash
+nc -zv -w 5 "${IP_SERVIDOR:?}" "${MIPUERTO:?}"   # debe conectar
+nc -zv -w 5 "${IP_SERVIDOR:?}" 22                # debe agotar el tiempo
+nc -zv -w 5 "${IP_SERVIDOR:?}" 80                # debe agotar el tiempo
+```
+
+Un puerto no abierto debe agotar el tiempo. `Connection refused` significa que los paquetes llegan sin filtrar y que el puerto quedará expuesto cuando algo escuche en él.
+
+Las reglas tal como las aplica el kernel:
 
 ```bash
 sudo nft list ruleset | less
 ```
 
-UFW genera reglas nftables a partir de su configuración de alto nivel. Esto permite ver exactamente qué está aplicando el kernel.
+#### 11.6 Firewall del proveedor de nube
 
-#### 9.6 Restricción del origen a un proxy de borde o CDN
+En la nube hay dos firewalls en serie: el del proveedor, en su red, y UFW, en la máquina. Un puerto abierto en UFW y cerrado en el proveedor no recibe nada; uno cerrado en UFW y abierto en el proveedor puede quedar expuesto si lo publica un contenedor. Aplica a los grupos de seguridad de Azure y AWS, los firewalls de Hetzner, DigitalOcean o Hostinger y las listas de seguridad de Oracle. En físico o en una VM sin esa capa no hay nada que configurar. Las órdenes de cada proveedor están en [`proveedores/`](proveedores/).
 
-> **Esta subsección no forma parte del despliegue base.** Se llega a ella desde el manual del proxy inverso, cuando el servicio ya está configurado para publicarse a través del borde. En el despliegue base, UFW queda solo con la regla de SSH de 9.3 y esta subsección se salta. Aplicarla antes no adelanta nada, porque todavía no hay ningún servicio escuchando en el 80 ni en el 443, y deja el resultado a merced del siguiente `ufw allow 80/tcp` que alguien ejecute siguiendo otro manual: UFW no avisa de que una regla abierta convive con las restringidas.
+##### 11.6.1 Dos firewalls, dos alcances
 
-Cuando el servicio web no se publica directamente sino a través de un proxy de borde (un CDN, un WAF gestionado, un balanceador del proveedor), dejar los puertos 80 y 443 abiertos a todo internet anula buena parte del beneficio: quien conozca la IP del servidor puede saltarse el borde y llegar al origen sin pasar por ninguno de sus controles. Y la IP del origen no es un secreto: queda en registros DNS históricos, en cabeceras de correo saliente y en certificados emitidos antes de la migración.
+Los dos se mantienen con las mismas reglas, porque cada uno cubre un fallo del otro. El del proveedor filtra antes de que el tráfico llegue, sobrevive a un error dentro de la máquina y es el único que alcanza a los puertos publicados por contenedores: el demonio inserta sus reglas en cadenas que UFW no gobierna. UFW cubre lo que el proveedor no ve, como las otras máquinas de la misma red virtual o una regla abierta por error en el panel, y se respalda y audita con el resto de `/etc`.
 
-El cierre consiste en aceptar esos puertos solo desde los rangos publicados por el proveedor del borde. La misma restricción se aplica en dos sitios, UFW y el firewall del proveedor de nube. Esta subsección cubre el primero; el segundo está en el Anexo C.
+> Sin firewall de proveedor, los puertos de contenedores quedan expuestos digan lo que digan las reglas de UFW. Filtrarlos en la cadena que consulta el propio demonio no está documentado ni verificado (To-do). Mientras tanto, no se publican puertos de contenedores en un servidor sin esa capa.
 
-##### Variables
+##### 11.6.2 Reglas según el momento del despliegue
 
-```bash
-export PROVEEDOR_CDN=<proveedor>                        # se usa como comentario de cada regla
-export RANGOS_URL_V4="https://<proveedor>/ips-v4"
-export RANGOS_URL_V6="https://<proveedor>/ips-v6"
-export RANGOS_ARCHIVO=/usr/local/etc/rangos-borde.txt   # copia local de la lista aplicada
-export PUERTOS_BORDE="443"                              # "80 443" si el borde también llega por HTTP
-```
+| Momento | Reglas de entrada | Dónde se decide |
+|---|---|---|
+| Despliegue base, este manual | Solo SSH en el puerto de la sección 10 | Sección 11.3 |
+| Servicio web publicado directamente | SSH, más 80 y 443 desde cualquier origen | Manual del proxy inverso |
+| Servicio web detrás de un borde | SSH, más 443 solo desde los rangos del borde | Manual de Caddy, sección 17 |
 
-> Para Cloudflare específicamente se puede utilizar lo siguiente:
->
-> ```bash
-> export PROVEEDOR_CDN=Cloudflare
-> export RANGOS_URL_V4="https://www.cloudflare.com/ips-v4"
-> export RANGOS_URL_V6="https://www.cloudflare.com/ips-v6"
-> ```
+Tres criterios valen para cualquier proveedor. Se borra lo que sobre de lo que ya exista, empezando por la regla del puerto 22 que suelen dejar los asistentes. Las reglas temporales se anotan al crearlas, se limitan a la dirección del administrador y se borran en la misma sesión. SSH se restringe a la dirección del administrador solo si es estable; si cambia, la restricción acaba cortando el acceso, y la protección real ya la dan la llave y fail2ban.
 
-`PUERTOS_BORDE` depende de cómo hable el borde con el origen. Si el borde redirige a HTTPS antes de reenviar, al origen solo llega tráfico por el 443 y el 80 no se abre. Si reenvía en el mismo esquema que usó el visitante y no redirige, hacen falta los dos. El manual del proxy inverso dice cuál es el caso.
+##### 11.6.3 Verificación desde fuera
 
-##### Descarga y comprobación de la lista
-
-La lista se descarga de la fuente oficial en lugar de transcribirse, porque cambia, y se guarda en un archivo antes de usarla. Iterar directamente sobre la salida de `curl` tiene un fallo silencioso: si la descarga falla, el bucle no añade ninguna regla y las órdenes que vienen después retiran las reglas abiertas igualmente. El resultado es un servidor sin servicio y sin ningún error en pantalla.
+Desde una máquina que no sea el servidor, con las variables de 10.2, tras cada cambio de reglas aquí o en UFW:
 
 ```bash
-rm -f /tmp/rangos-v4.txt /tmp/rangos-v6.txt
-curl -fsS "${RANGOS_URL_V4:?}" -o /tmp/rangos-v4.txt
-curl -fsS "${RANGOS_URL_V6:?}" -o /tmp/rangos-v6.txt
-
-for F in /tmp/rangos-v4.txt /tmp/rangos-v6.txt; do
-  if [ -s "${F}" ] && ! grep -qvE '^[0-9a-fA-F:.]+/[0-9]{1,3}$' "${F}"; then
-    echo "✓ ${F}: $(grep -c . "${F}") rangos"
-  else
-    echo "✗ ${F}: vacío o con líneas que no son rangos"
-  fi
-done
+PUERTO_CONTENEDOR=8080   # un puerto publicado por un contenedor, si los hay
+nc -zv -w 5 "${IP_SERVIDOR:?}" "${MIPUERTO:?}"            # debe conectar
+nc -zv -w 5 "${IP_SERVIDOR:?}" 22                         # debe agotar el tiempo
+nc -zv -w 5 "${IP_SERVIDOR:?}" 443                        # según la fila de 11.6.2 que aplique
+nc -zv -w 5 "${IP_SERVIDOR:?}" "${PUERTO_CONTENEDOR:?}"   # debe agotar el tiempo
 ```
 
-Las dos líneas deben empezar por `✓`. Si alguna empieza por `✗`, no se continúa: se abre el archivo, que suele contener una página de error del proveedor en lugar de la lista.
+Si conecta, el puerto está abierto en los dos firewalls y hay servicio. Si agota el tiempo, algún firewall lo descarta, lo deseado en todo puerto no público. `connection refused` significa que el camino está abierto y nada escucha, y quedará expuesto cuando algo lo haga. Detrás de un borde, el 443 debe agotar el tiempo desde fuera del borde, y un puerto de contenedor que conecta desde fuera está expuesto, diga lo que diga `ufw status`.
 
-```bash
-{ cat /tmp/rangos-v4.txt; echo; cat /tmp/rangos-v6.txt; echo; } | grep -v '^$' \
-  | sudo tee "${RANGOS_ARCHIVO:?}" > /dev/null
-cat "${RANGOS_ARCHIVO}"
-```
+##### 11.6.4 Mantenimiento
 
-Los `echo` intermedios no son decorativos: la lista de IPv4 puede no terminar en salto de línea, y sin ellos su último rango queda pegado al primero de IPv6. Revisa la salida antes de seguir; es la lista que va a decidir quién llega al servicio.
+Las reglas del proveedor no viajan con los respaldos del servidor, así que se documentan en el inventario (22.1) y el diagrama (22.2). La regla que no se explique con una fila de 11.6.2 se borra. La revisión y actualización de cada proveedor están en su documento de [`proveedores/`](proveedores/); cuando cambian los rangos del borde, se actualizan en la misma sesión que UFW (manual de Caddy, sección 17.5).
 
-##### Aplicación
+### 12. Protección contra fuerza bruta (fail2ban)
 
-El orden importa: primero se añaden las reglas restringidas y después se retiran las abiertas, para no quedarse sin servicio entre una orden y la siguiente.
+**Opcional, recomendado.** Con SSH solo por llave, en un puerto alto, con `limit` en UFW y con `PerSourcePenalties`, un atacante no pasa de la autenticación. fail2ban lee el journal, banea las direcciones que insisten y reduce el ruido que tapa los eventos reales; es la capa que sirve además para los servicios que añadan los roles.
 
-```bash
-for R in $(cat "${RANGOS_ARCHIVO:?}"); do
-  for P in ${PUERTOS_BORDE:?}; do
-    sudo ufw allow from "${R}" to any port "${P}" proto tcp comment "${PROVEEDOR_CDN:?}"
-  done
-done
+> **Relación con `pam_faillock` (§9.3.3):** fail2ban actúa sobre accesos por red; `pam_faillock`, sobre la autenticación local (`su`, `sudo`, consola), que no deja entradas que fail2ban pueda leer. No se solapan.
 
-sudo ufw status numbered
-```
-
-##### Retiro de las reglas abiertas
-
-Cualquier regla que admita el 80 o el 443 desde un origen que no sea el borde deja el cierre sin efecto. No basta con `ufw delete allow 80/tcp`: esa orden solo borra la regla escrita exactamente así, y deja intactas una regla multipuerto como `80,443/tcp` o una creada con otra forma. Se buscan todas:
-
-```bash
-sudo ufw status numbered | grep -E '(^|[^0-9])(80|443)([^0-9]|$)' | grep -v "${PROVEEDOR_CDN:?}"
-```
-
-Cada línea que devuelva es una regla todavía abierta. Se borran por su número, de mayor a menor, porque al borrar una se renumeran las que le siguen:
-
-```bash
-sudo ufw delete <número>
-```
-
-La búsqueda se repite hasta que no devuelva nada. En un servidor donde esos puertos nunca se abrieron a internet, que es lo que ocurre cuando se sigue el orden que marca el manual del proxy inverso para un sitio nuevo, no hay nada que retirar.
-
-> **Si el servicio ya estaba publicado directamente, no retires las reglas abiertas antes de comprobar que el borde funciona.** Si el proxy todavía no está sirviendo correctamente y cierras el origen, te quedas sin ruta de acceso al servicio. Añadir las reglas restringidas no tiene ese riesgo; retirar las abiertas, sí.
-
-##### Verificación
-
-Se hace desde una máquina externa y tiene dos partes. Que el servicio siga respondiendo por su nombre, y que no responda por su IP:
-
-```bash
-curl -sI https://<dominio> | head -3
-nc -zv -w 5 <ip-publica-del-origen> 443
-nc -zv -w 5 <ip-publica-del-origen> 80
-```
-
-La primera orden debe responder. Las otras dos deben agotar el tiempo de espera. Si alguna devuelve `connection refused` o llega a conectar, el puerto sigue alcanzable desde fuera del borde y hay que revisar las reglas de aquí y las del Anexo C.
-
-> El puerto de SSH no se incluye en esta restricción, porque no pasa por el borde: se administra con su propia regla y por la IP del origen, no por el nombre de dominio. Antes de terminar, anota esa IP y comprueba que entras por SSH usándola. Con el borde activo, el nombre del dominio ya no resuelve al servidor.
-
-> Estas reglas no alcanzan a los puertos publicados por contenedores. El demonio de contenedores inserta sus propias reglas en cadenas que UFW no gobierna, de modo que un puerto publicado por un contenedor queda accesible aunque UFW diga lo contrario. Ese filtrado se resuelve en el firewall del proveedor, según el Anexo C.
-
-##### Mantenimiento de la lista
-
-Los rangos cambian pocas veces, pero cambian, y la lista queda copiada en tres sitios: estas reglas de UFW, el firewall del proveedor de nube y la declaración de proxies confiables del proxy inverso. Los síntomas de olvidar cada uno son distintos. Un rango nuevo que falte en cualquiera de los dos firewalls corta el servicio para la parte de los visitantes que el borde encamine por él. Uno que falte en el proxy inverso no corta nada y ensucia los registros de acceso durante meses.
-
-La comprobación compara la lista publicada con la copia aplicada, y es apta para una revisión mensual:
-
-```bash
-{ curl -fsS "${RANGOS_URL_V4:?}"; echo; curl -fsS "${RANGOS_URL_V6:?}"; echo; } \
-  | grep -v '^$' | sort > /tmp/rangos-hoy.txt
-
-[ -s /tmp/rangos-hoy.txt ] && sort "${RANGOS_ARCHIVO:?}" | diff - /tmp/rangos-hoy.txt \
-  && echo "✓ sin cambios" || echo "✗ la lista cambió o no se pudo descargar"
-```
-
-Las líneas que `diff` marca con `>` son rangos nuevos y las que marca con `<` son rangos retirados. Ante un cambio se repite esta subsección desde la descarga y se actualizan los otros dos sitios en la misma sesión. Los rangos retirados se borran por número al final, cuando los nuevos ya están aplicados.
-
-### 10. Protección contra fuerza bruta (fail2ban)
-
-UFW con `limit` corta ráfagas cortas en SSH. fail2ban añade una capa complementaria: lee los logs (en Trixie, vía journald), detecta patrones de abuso (autenticación fallida, escaneo, bots), y banea las IPs ofensoras durante un período configurable.
-
-En un servidor con SSH solo por llave (sección 8), un atacante automatizado nunca pasa de la fase de autenticación, pero igual genera ruido en logs, consume CPU, y deja huella en `journalctl` que dificulta encontrar eventos reales. fail2ban silencia ese ruido.
-
-> **Relación con `pam_faillock` (§7.3.3):** fail2ban actúa sobre intentos de acceso remoto por red (SSH, servicios web, etc.). `pam_faillock` actúa sobre autenticación local a nivel PAM, cubriendo `su`, `sudo`, login de consola y otros servicios que no generan entradas que fail2ban pueda parsear. Las dos capas son complementarias y no se solapan.
-
-#### 10.1 Instalación
+#### 12.1 Instalación
 
 ```bash
 sudo apt install -y fail2ban
 ```
 
-En Debian 13, fail2ban se integra con `nftables` y `journald` por defecto. Esto cambia respecto a versiones anteriores que usaban `iptables` y archivos de log planos. La consecuencia práctica es que no hay que tocar la configuración del backend — los defaults funcionan con el sistema actual.
+En Debian 13 usa nftables y journald por defecto; no hay que tocar el backend.
 
-#### 10.2 Configuración local (`jail.local`)
+#### 12.2 Configuración local (`jail.local`)
 
-fail2ban distribuye su configuración en `/etc/fail2ban/jail.conf`. Ese archivo se sobrescribe en upgrades. La forma correcta de personalizar es crear `/etc/fail2ban/jail.local`:
+`jail.conf` se sobrescribe en las actualizaciones; lo propio va en `jail.local`:
 
 ```bash
-export MIPUERTO=17177 # Definido en 8.1
+export MIPUERTO=17177 # Definido en 10.1
 
-# Descargar y aplicar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar y aplicar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §3.1.1)
 : "${ASSETS_BASE:?}" "${MIPUERTO:?}" && \
 wget "${ASSETS_BASE}/plantilla-etc-fail2ban-jail.local.txt" \
     -O /tmp/plantilla-etc-fail2ban-jail.local.txt && \
 sed -e "s|\$MIPUERTO|${MIPUERTO}|g" \
     /tmp/plantilla-etc-fail2ban-jail.local.txt \
-    | sudo tee /etc/fail2ban/jail.local > /dev/null
+    | sudo install -m 0640 -o root -g root /dev/stdin /etc/fail2ban/jail.local
 
 # Comprobar que no quedó ningún marcador sin sustituir
 sudo grep -n '\$MI[A-Z_]*' /etc/fail2ban/jail.local || echo "✓ plantilla aplicada"
-
-# Permisos correctos 
-sudo chmod 640 /etc/fail2ban/jail.local
 ```
 
-**Significado de los parámetros clave:**
+`bantime` es la duración del baneo; `findtime`, la ventana en la que se cuentan `maxretry` fallos; `bantime.increment` dobla el baneo de los reincidentes hasta `maxtime`; `mode = aggressive` cuenta además desconexiones en preauth y protocolos viejos. `port = 17177` debe coincidir con el puerto de SSH.
 
-- `bantime` — duración del baneo. 1 hora es agresivo pero razonable.
-- `findtime` — ventana en la que se cuentan los `maxretry` fallos.
-- `maxretry` — fallos permitidos en `findtime` antes de banear.
-- `bantime.increment` — cada vez que la misma IP reincide, el ban se multiplica (1h, 2h, 4h, 8h... hasta `maxtime`).
-- `mode = aggressive` en el jail `sshd` — incluye no solo "Failed password" sino también desconexiones por preauth, autenticación incorrecta, intentos de protocolos viejos.
-
-`port = 17177` debe coincidir con el puerto SSH endurecido. Si en algún momento se cambia el puerto, recordar actualizar este valor.
-
-> **Atención al `ignoreip`.** Añadir aquí las redes desde las que se administra el servidor evita un autoban accidental tras varios fallos legítimos (llave equivocada, agente sin cargar). Pero no añadir redes amplias o no controladas — eso anula la protección.
+> **`ignoreip`.** Las redes de administración evitan un autobaneo tras varios fallos legítimos, pero una red amplia o ajena anula la protección.
 
 ```ini
 ignoreip = 127.0.0.1/8 ::1 192.0.2.0/24
 ```
 
-#### 10.3 Activación
+#### 12.3 Activación
 
 ```bash
-sudo systemctl enable --now fail2ban
+sudo systemctl enable fail2ban
+sudo systemctl restart fail2ban
 sudo systemctl status fail2ban --no-pager
 ```
 
-Si la configuración tiene un error de sintaxis, `status` muestra `failed`. Inspeccionar:
+El paquete arranca el servicio al instalarse, antes de que exista `jail.local`, y `enable --now` no lo reinicia: seguiría vigilando el puerto 22 con los valores de Debian. Por eso el `restart`. Para confirmar que el jail arrancó después del archivo:
+
+```bash
+sudo grep -E "Jail 'sshd' started" /var/log/fail2ban.log | tail -1
+sudo ls -l --time-style=full-iso /etc/fail2ban/jail.local
+```
+
+La hora de arranque debe ser posterior a la del archivo. Si `status` muestra `failed`:
 
 ```bash
 sudo journalctl -u fail2ban -n 50 --no-pager
 ```
 
-#### 10.4 Monitoreo de bans
-
-Estado general:
+#### 12.4 Monitoreo de bans
 
 ```bash
 sudo fail2ban-client status
 ```
 
-Detalle del jail SSH:
-
 ```bash
 sudo fail2ban-client status sshd
 ```
 
-Salida típica:
+En un servidor recién configurado, con un fallo:
 
-```
+```text
 Status for the jail: sshd
 |- Filter
-|  |- Currently failed: 2
-|  |- Total failed:     147
-|  `- File list:        /var/log/auth.log (via systemd)
+|  |- Currently failed:    1
+|  |- Total failed:    1
+|  `- Journal matches:    _SYSTEMD_UNIT=ssh.service + _COMM=sshd
 `- Actions
-   |- Currently banned: 5
-   |- Total banned:     38
-   `- Banned IP list:   45.x.x.x 91.x.x.x ...
+   |- Currently banned:    0
+   |- Total banned:    0
+   `- Banned IP list:
 ```
 
-**Comandos útiles de operación:**
+Con `backend = systemd` el filtro dice `Journal matches`; un `File list` indica que `jail.local` no se cargó. El `+` es un O lógico: `_SYSTEMD_UNIT=ssh.service` cubre también las líneas de `sshd-session`, que registra la autenticación desde OpenSSH 9.8. Para comprobar el filtro sin esperar un ataque:
+
+```bash
+fail2ban-regex "2026-10-17T00:04:29-05:00 servidor sshd-session[7039]: Connection closed by authenticating user usuario 203.0.113.9 port 57178 [preauth]" \
+    "sshd[mode=aggressive]" | grep -E '^Lines:'
+```
+
+```text
+Lines: 1 lines, 0 ignored, 1 matched, 0 missed
+```
+
+Las líneas `srclimit_penalise` de `PerSourcePenalties` (10.4) no las reconoce el filtro, y no hace falta.
+
+Operación:
 
 ```bash
 # Desbanear una IP manualmente (por ejemplo, si fue uno mismo)
@@ -2434,143 +2352,98 @@ sudo fail2ban-client set sshd banip 1.2.3.4
 # Ver IPs que han sido baneadas alguna vez en este jail
 sudo fail2ban-client get sshd banip --with-time
 ```
-#### 10.5 Límites del modelo por IP
 
-fail2ban cuenta fallos por dirección de origen dentro de una ventana de tiempo. Ese modelo funciona contra el atacante que insiste desde una sola máquina, que es el caso habitual en SSH, y por eso la sección anterior sigue siendo válida.
+#### 12.5 Límites del modelo por IP
 
-Deja de funcionar cuando el ataque se reparte. Una campaña distribuida contra un formulario de acceso web puede usar cientos de direcciones distintas, cada una con un ritmo deliberadamente bajo —del orden de un intento cada varios minutos— sostenido durante días. Ninguna alcanza el umbral de `maxretry` dentro de `findtime`, así que ninguna se banea, mientras el volumen agregado sí es alto. Bajar el umbral para atraparlas no resuelve el problema y crea otro: empieza a banear a usuarios legítimos que se equivocan de contraseña.
+fail2ban cuenta fallos por dirección y funciona contra quien insiste desde una máquina, el caso habitual en SSH. No sirve contra una campaña distribuida: cientos de direcciones con un intento cada varios minutos, durante días, ninguna llega a `maxretry` y bajar el umbral solo banea a usuarios legítimos. La señal está en el agregado (peticiones por minuto contra una ruta y direcciones distintas por hora), que mide el síntoma B.13 del manual de Caddy.
 
-La señal aprovechable en ese escenario no está en la IP individual sino en el agregado: peticiones por minuto contra una ruta concreta, y número de direcciones distintas activas por hora. El Anexo B.11 explica cómo medir ambas cosas sobre un log de acceso.
+Hay dos respuestas, ninguna de fail2ban: un límite de ritmo global por ruta en el proxy inverso, que cuenta todas las peticiones sin distinguir origen, y la reputación compartida, como CrowdSec, donde una dirección señalada por otro operador llega ya bloqueada. CrowdSec no se ha desplegado ni verificado (To-do). Nada de esto es motivo para retirar fail2ban, que sigue siendo la defensa contra el abuso concentrado.
 
-Hay dos formas de cubrir el hueco, y ninguna es fail2ban.
+### 13. Hardening del kernel y del sistema
 
-La primera es un límite de ritmo global por ruta, aplicado en el proxy inverso en lugar de en el firewall. Cuenta todas las peticiones a esa ruta sin distinguir origen, de modo que un ataque repartido entre trescientas direcciones cuenta igual que si viniera de una. El umbral se fija muy por encima del uso real y muy por debajo del volumen del ataque, que en la práctica suelen ser órdenes de magnitud distintos.
+Parámetros del kernel, módulos, cargador de arranque y servicios en escucha. Como en SSH, los cambios van en archivos propios de `/etc/sysctl.d/` y `/etc/modprobe.d/`.
 
-La segunda es la reputación compartida. Herramientas como CrowdSec invierten el modelo de fail2ban: cada instalación reporta lo que detecta y todas consumen una lista comunitaria, de modo que una dirección señalada por otro operador llega ya bloqueada sin haber intentado nada aquí. Es la respuesta directa al problema de que una instalación aislada nunca ve suficiente para decidir.
-
-> CrowdSec no está documentado en este manual porque no se ha desplegado ni verificado en los entornos del corpus. Queda anotado en el To-do, y prometer un procedimiento no probado sería peor que omitirlo.
-
-> Conviene no leer esta subsección como una razón para retirar fail2ban. Son capas distintas: fail2ban sigue siendo la defensa correcta contra el abuso concentrado y contra el ruido en los logs de SSH, y no estorba a ninguna de las dos opciones anteriores.
-
-### 11. Hardening del kernel y del sistema
-
-Esta sección aplica hardening a nivel de kernel mediante `sysctl`, ajusta límites de recursos, deshabilita módulos innecesarios, y protege el bootloader cuando aplica.
-
-Los parámetros `sysctl` modifican comportamiento del kernel en caliente. Las modificaciones persistentes se hacen en archivos `*.conf` dentro de `/etc/sysctl.d/`. Como en SSH y UFW, se evita editar archivos canónicos (`/etc/sysctl.conf`) y se usa un archivo propio de hardening.
-
-#### 11.1 Parámetros sysctl de red y de kernel
+#### 13.1 Parámetros sysctl de red y de kernel
 
 ```bash
-# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §3.1.1)
 : "${ASSETS_BASE:?}" && \
 wget "${ASSETS_BASE}/plantilla-etc-sysctl.d-99-hardening.conf.txt" \
     -O /tmp/plantilla-etc-sysctl.d-99-hardening.conf.txt && \
-sudo cp /tmp/plantilla-etc-sysctl.d-99-hardening.conf.txt /etc/sysctl.d/99-hardening.conf
+sudo install -m 0644 -o root -g root /tmp/plantilla-etc-sysctl.d-99-hardening.conf.txt /etc/sysctl.d/99-hardening.conf
 ```
 
-**Justificación de los más relevantes:**
-
-- `rp_filter = 1` — Reverse Path Filtering en modo estricto. Si un paquete llega desde una IP origen para la que la ruta de retorno usaría otra interfaz, se descarta. Bloquea spoofing trivial.
-- `tcp_syncookies = 1` — Cuando la cola de SYN se llena (típico en un SYN flood), el kernel responde con cookies en lugar de mantener estado. Permite distinguir conexiones reales bajo ataque.
-- `accept_redirects = 0` y `send_redirects = 0` — Los ICMP redirects son una vía clásica de man-in-the-middle local. Solo tienen sentido en routers, y este servidor no lo es.
-- `log_martians = 1` — Paquetes con direcciones de origen imposibles se loguean en `dmesg`. Útil para detectar configuraciones de red rotas o intentos de ataque.
-
-**Aplicar los parámetros:**
+- `rp_filter = 1`: descarta paquetes cuyo camino de vuelta saldría por otra interfaz, lo que frena el spoofing trivial.
+- `tcp_syncookies = 1`: ante una cola de SYN llena responde con cookies en lugar de guardar estado.
+- `accept_redirects = 0` y `send_redirects = 0`: los ICMP redirects son una vía clásica de intermediario local y solo tienen sentido en routers.
+- `log_martians = 1`: registra paquetes con origen imposible.
+- `fs.suid_dumpable = 0`: sin volcados de memoria de procesos setuid, que pueden contener credenciales.
+- `dev.tty.ldisc_autoload = 0` y `net.core.bpf_jit_harden = 2`: añadidos en la v1.2 por KRNL-6000 de lynis (14.5). El primero impide a un usuario sin privilegios cargar disciplinas de línea de TTY; el segundo endurece el JIT de BPF también para root. De esa misma sugerencia se descarta `kernel.modules_disabled = 1`, que impide cargar módulos hasta reiniciar, y `kernel.unprivileged_bpf_disabled` se deja en el 2 de Debian, que ya bloquea BPF sin privilegios.
 
 ```bash
 sudo sysctl --system
 ```
 
-La salida recorre todos los archivos de `/etc/sysctl.d/` e imprime cada clave aplicada. Conviene leerla completa la primera vez: cualquier línea que el kernel rechace aparece como `sysctl: setting key "...": Invalid argument` y es fácil pasarla por alto entre las decenas de líneas correctas.
+La primera vez conviene leer toda la salida: una clave rechazada aparece como `sysctl: setting key "...": Invalid argument` entre decenas de líneas correctas. `--system` recarga `/etc/sysctl.conf`, `/etc/sysctl.d/` y `/usr/lib/sysctl.d/`.
 
-> `kernel.perf_event_paranoid = 3` es la única línea que fallaría fuera de Debian: el nivel 3 lo añade un parche de Debian y ya es su valor por defecto, así que aquí solo lo hace explícito.
-
-`--system` recarga `/etc/sysctl.conf`, todos los archivos en `/etc/sysctl.d/`, y los del paquete (`/usr/lib/sysctl.d/`). La salida lista cada parámetro aplicado.
-
-**Verificar un parámetro concreto:**
+> `kernel.perf_event_paranoid = 3` solo existe en Debian, que lo trae por defecto; aquí se hace explícito.
 
 ```bash
 sudo sysctl kernel.kptr_restrict
 sudo sysctl net.ipv4.tcp_syncookies
 ```
 
-En Debian 13, varios de estos parámetros ya tienen valores razonables por defecto. El archivo `99-hardening.conf` los fija explícitamente para que el endurecimiento no dependa de defaults futuros.
+Varios valores ya son los de Debian 13; fijarlos evita depender de futuros cambios de defaults.
 
-> **Roles que reenvían paquetes.** Contenedores, virtualización y VPN necesitan `net.ipv4.ip_forward = 1`, y sus demonios lo activan al arrancar. Si algún archivo de este servidor lo fija en `0`, un `sysctl --system` ejecutado con el rol ya en marcha lo vuelve a apagar: los contenedores pierden la red y ningún servicio aparece como fallido. Antes de instalar un rol de ese tipo, comprueba qué hay escrito:
+> **Roles que reenvían paquetes.** Contenedores, virtualización y VPN necesitan `net.ipv4.ip_forward = 1`, que sus demonios activan al arrancar. Si algún archivo lo fija en `0`, un `sysctl --system` con el rol en marcha deja a los contenedores sin red sin que nada falle. Antes de instalar un rol así:
 >
 > ```bash
 > grep -rn "ip_forward" /etc/sysctl.d/ /etc/sysctl.conf 2>/dev/null
 > ```
 >
-> Si aparece fijado en `0`, el manual del rol lo anula en un archivo propio que se lea después, por ejemplo `/etc/sysctl.d/99-zz-reenvio.conf`, en lugar de editar la plantilla.
+> Si aparece en `0`, el manual del rol lo anula en un archivo que se lea después, como `/etc/sysctl.d/99-zz-reenvio.conf`.
 
-#### 11.2 Límites de recursos (`/etc/security/limits.conf`)
+#### 13.2 Deshabilitar módulos de kernel innecesarios
 
-`limits.conf` define límites de procesos, memoria, archivos abiertos, etc. para usuarios y sesiones. En un servidor base, los defaults son aceptables. Conviene ajustar dos cosas:
-
-**Deshabilitar core dumps para usuarios normales:**
+**Opcional, recomendado.** Cada módulo cargado es código en el kernel; los buses y sistemas de archivos que un servidor no usa son superficie gratuita.
 
 ```bash
-sudoedit /etc/security/limits.d/99-hardening.conf
-```
-
-Agregar:
-
-```
-# Sin core dumps por defecto (los core pueden contener datos sensibles en RAM)
-*               hard    core            0
-*               soft    core            0
-```
-
-Los core dumps son útiles para depurar, pero en producción su valor es bajo y su riesgo (filtración de credenciales, claves) es real. Si en algún momento se necesita depurar un proceso concreto, se levanta el límite solo para esa sesión.
-
-#### 11.3 Deshabilitar módulos de kernel innecesarios
-
-Cada módulo cargado es código ejecutándose en kernel space. Los módulos no usados son superficie de ataque gratuita. En un servidor, varios buses y filesystems no se necesitan nunca.
-
-```bash
-# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §3.1.1)
 : "${ASSETS_BASE:?}" && \
 wget "${ASSETS_BASE}/plantilla-etc-modprobe.d-99-hardening.conf.txt" \
     -O /tmp/plantilla-etc-modprobe.d-99-hardening.conf.txt && \
-sudo cp /tmp/plantilla-etc-modprobe.d-99-hardening.conf.txt /etc/modprobe.d/99-hardening.conf
+sudo install -m 0644 -o root -g root /tmp/plantilla-etc-modprobe.d-99-hardening.conf.txt /etc/modprobe.d/99-hardening.conf
 ```
 
-`install <modulo> /bin/true` hace que cualquier intento de cargar el módulo ejecute `/bin/true` (que termina con éxito sin hacer nada). Más limpio que `blacklist`, que solo evita la carga automática pero permite la carga explícita.
+`install <modulo> /bin/true` convierte cualquier carga en un éxito vacío, más firme que `blacklist`, que permite la carga explícita.
 
-> **Roles con contenedores.** Su red depende de módulos que una lista de bloqueo genérica puede incluir. Antes de instalar un motor de contenedores, comprueba que la plantilla no bloquee ninguno de los habituales:
+> **Contenedores.** Su red depende de módulos que una lista genérica podría bloquear, y un módulo bloqueado así no da ningún error. Antes de instalar un motor de contenedores:
 >
 > ```bash
 > grep -nE 'overlay|br_netfilter|bridge|veth|vxlan|ip_vs' /etc/modprobe.d/99-hardening.conf \
 >   || echo "✓ ninguno bloqueado"
 > ```
->
-> Un módulo bloqueado con `install <modulo> /bin/true` no produce ningún error al cargarse: el demonio cree que lo tiene y la red del contenedor simplemente no funciona.
 
-> Bloquear `udf` impide montar ISOs y medios ópticos. Irrelevante en un servidor de aplicaciones; no así en un host de virtualización. Si el rol lo necesita, comentar esa línea y anotarlo en el runbook (§20.3).
+> Bloquear `udf` impide montar ISOs. En un host de virtualización se comenta esa línea y se anota en el runbook (§22.3).
 
-> **Especial cuidado con USB storage en servidores físicos donde el operador usa pendrives administrativos.** No deshabilitar `usb-storage` si se necesita conectar discos externos para respaldos. En servidores de colocation o data center, donde nadie debería conectar nada físicamente, sí tiene sentido bloquearlo:
+> **`usb-storage`.** En físicos donde se conectan discos de respaldo no se bloquea; en colocation o centro de datos, sí:
 >
-> ```
+> ```text
 > install usb-storage /bin/true
 > ```
 >
-> En VMs y VPS no aplica — no hay USB físico.
+> En VMs y VPS no aplica.
 
-**Aplicar:**
-
-Los `install` directives toman efecto al siguiente intento de carga del módulo. Para descargar un módulo ya cargado:
+Los `install` actúan en el siguiente intento de carga. Para descargar un módulo ya cargado:
 
 ```bash
 sudo lsmod | grep firewire
 sudo modprobe -r firewire-core   # si está cargado y no se usa
 ```
 
-#### 11.4 Protección de GRUB (solo bare metal)
+#### 13.3 Protección de GRUB (solo bare metal)
 
-En servidores físicos donde el atacante puede acceder a la consola, GRUB permite editar la línea de kernel y arrancar con `init=/bin/bash`, lo que da shell de root sin contraseña. La protección se hace exigiendo contraseña para **editar** entradas, no para arrancar (eso convertiría el servidor en no-rebooteable sin intervención humana).
-
-**No aplicar esto en VMs ni VPS.** En VMs, la consola la controla el hypervisor; en VPS, el proveedor maneja el booteo. Aplicarlo solo si el servidor es físico y la consola es accesible.
+**Opcional:** solo en servidores físicos con consola accesible. En VMs y VPS la consola la controla el hipervisor o el proveedor, y **no se aplica**. Sin protección, editar la línea del kernel con `init=/bin/bash` da una shell de root. Se exige contraseña para **editar** entradas, no para arrancar, para que el servidor pueda reiniciarse sin intervención.
 
 ```bash
 # Generar hash de contraseña para GRUB
@@ -2578,13 +2451,13 @@ grub-mkpasswd-pbkdf2
 # Pide contraseña dos veces, devuelve un hash que comienza con 'grub.pbkdf2.sha512.10000...'
 ```
 
-Crear `/etc/grub.d/40_password`:
+Se crea `/etc/grub.d/40_password`:
 
 ```bash
 sudoedit /etc/grub.d/40_password
 ```
 
-```
+```sh
 #!/bin/sh
 exec tail -n +3 $0
 # Este archivo añade un usuario admin al menú de GRUB.
@@ -2597,26 +2470,42 @@ password_pbkdf2 admin <hash-pegado-aqui>
 sudo chmod +x /etc/grub.d/40_password
 ```
 
-Configurar las entradas para que sean arrancables sin contraseña pero no editables. En `/etc/grub.d/10_linux`, la directiva por defecto añade `--unrestricted` automáticamente desde Debian 11 si se detecta `superusers`, pero conviene verificar tras regenerar:
+Desde Debian 11, `10_linux` añade `--unrestricted` a cada `menuentry` cuando hay `superusers`. Se comprueba tras regenerar:
 
 ```bash
 sudo update-grub
 sudo grep -E 'menuentry|unrestricted' /boot/grub/grub.cfg | head -20
 ```
 
-Cada `menuentry` debe tener `--unrestricted` para que arranque sin contraseña.
+Cada `menuentry` debe tener `--unrestricted`.
 
-### 12. Auditoría y detección
+#### 13.4 Servicios que escuchan en la red sin necesidad
 
-Las secciones anteriores previenen: cierran puertos, deniegan accesos, endurecen el kernel. Esta sección detecta: deja constancia de lo que ocurre en el sistema para que un compromiso futuro pueda investigarse. La detección sin prevención es ciega; la prevención sin detección es sorda. Las dos se complementan.
+Un servicio que escucha en todas las interfaces sin hacer falta queda expuesto el día que UFW se desactive para un diagnóstico o una regla se abra de más:
 
-El alcance aquí es deliberadamente modesto: reglas mínimas de `auditd` que cubren los archivos críticos de identidad y privilegio, escaneo periódico contra rootkits conocidos, y verificación de integridad de paquetes y archivos del sistema. Configuraciones más exhaustivas (PCI-DSS, CIS Level 2, etc.) las cubren manuales de compliance específicos.
+```bash
+ss -tlnu
+```
 
-#### 12.1 `auditd` — reglas mínimas
+En un servidor base solo SSH debe aparecer en `0.0.0.0` o `[::]`; lo ligado a `127.0.0.1`, `::1` o `127.0.0.53` no es accesible desde fuera. El caso habitual con `systemd-resolved` es LLMNR, en el 5355 TCP y UDP de todas las interfaces, inútil en un servidor. Se desactiva con mDNS:
 
-`auditd` es el subsistema de auditoría del kernel Linux. Registra eventos del kernel (llamadas al sistema, accesos a archivos, ejecución de binarios) en `/var/log/audit/audit.log`. Es invasivo y verboso si se usa sin criterio, así que el enfoque es vigilar pocos archivos pero los importantes.
+```bash
+sudo install -d -m 0755 /etc/systemd/resolved.conf.d
+printf '[Resolve]\nLLMNR=no\nMulticastDNS=no\n' | sudo install -m 0644 /dev/stdin /etc/systemd/resolved.conf.d/10-sin-llmnr.conf
+sudo systemctl restart systemd-resolved
+ss -tlnu | grep ':5355' || echo "✓ LLMNR desactivado"
+getent hosts deb.debian.org
+```
 
-**Instalación:**
+Los permisos van explícitos porque `systemd-resolved` corre como `systemd-resolve`: con la `UMASK 027` de 9.4, un directorio y un archivo creados con `mkdir` y `tee` quedarían ilegibles para él, y LLMNR seguiría activo. La última orden confirma que el DNS sigue funcionando. Sin `systemd-resolved` activo, no aplica.
+
+### 14. Auditoría y detección
+
+Las secciones anteriores previenen; esta deja constancia de lo que ocurre para poder investigar un compromiso. El alcance es modesto: reglas mínimas de auditoría e integridad de paquetes y archivos. Los marcos de cumplimiento (PCI-DSS, CIS nivel 2) tienen sus propios manuales.
+
+#### 14.1 `auditd` — reglas mínimas
+
+**Opcional, recomendado;** fundamental con requisitos de auditoría. Registra eventos del kernel en `/var/log/audit/audit.log`. Es verboso, así que vigila pocos archivos, los importantes.
 
 ```bash
 sudo apt install -y auditd audispd-plugins
@@ -2626,11 +2515,11 @@ sudo systemctl enable --now auditd
 **Reglas básicas:**
 
 ```bash
-# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §3.1.1)
 : "${ASSETS_BASE:?}" && \
 wget "${ASSETS_BASE}/plantilla-etc-audit-rules.d-99-hardening.rules.txt" \
     -O /tmp/plantilla-etc-audit-rules.d-99-hardening.rules.txt && \
-sudo cp /tmp/plantilla-etc-audit-rules.d-99-hardening.rules.txt /etc/audit/rules.d/99-hardening.rules
+sudo install -m 0640 -o root -g root /tmp/plantilla-etc-audit-rules.d-99-hardening.rules.txt /etc/audit/rules.d/99-hardening.rules
 ```
 
 **Recargar reglas:**
@@ -2641,9 +2530,9 @@ sudo systemctl restart auditd
 sudo auditctl -l   # listar reglas activas
 ```
 
-Dos comportamientos que de otro modo parecen fallas. `augenrules` no respeta la posición de las directivas globales: reubica el último `-D` como primera línea del archivo fusionado, el último `-b` como segunda, el último `-f` como tercera y el último `-e` como última, sin importar en qué archivo estén. Y el `-e 2` deja las reglas inmutables hasta el próximo reinicio, así que un `augenrules --load` posterior falla y `auditctl -D` no vacía nada: es la protección funcionando, no un problema de permisos. Para cambiar reglas, editar el archivo y reiniciar. Los comentarios de la plantilla lo detallan.
+`augenrules` reubica las directivas globales: el último `-D` como primera línea, el último `-b` como segunda, el último `-f` como tercera y el último `-e` como última, vengan del archivo que vengan. Con `-e 2` las reglas quedan inmutables hasta reiniciar: un `augenrules --load` posterior falla y `auditctl -D` no vacía nada, y es la protección funcionando. Para cambiar reglas se edita el archivo y se reinicia.
 
-Comprobar el resultado efectivo, que es lo único que vale:
+La salida de `augenrules --load` empieza con `No rules`, la respuesta del `-D`, y repite `Old style watch rules are slower` por cada `-w`, que siguen siendo válidas. El bloque de estado que importa es el último, con `enabled 2`.
 
 ```bash
 sudo head -4 /etc/audit/audit.rules   # -D, -b y -f reubicados al inicio
@@ -2651,7 +2540,7 @@ sudo tail -1 /etc/audit/audit.rules   # -e 2 al final
 sudo auditctl -s                 # enabled=2, failure=1
 ```
 
-**Ejemplos de consulta del log:**
+**Consultas:**
 
 ```bash
 # Eventos recientes con la clave 'identidad'
@@ -2664,62 +2553,22 @@ sudo aureport -u --summary
 sudo ausearch -k root_exec | sudo aureport -x
 ```
 
-El log de auditoría crece. `auditd` rota automáticamente, pero conviene revisar `/etc/audit/auditd.conf` para ajustar `max_log_file` y `num_logs` según el espacio disponible en `/var/log` (que en el esquema de particionado de la sección 2.2 es un LV separado precisamente por esto).
-
-#### 12.2 `rkhunter` — escaneo de rootkits
-
-`rkhunter` busca firmas conocidas de rootkits, archivos sospechosos en directorios del sistema, y modificaciones en binarios críticos. No es infalible (rootkits modernos lo evaden), pero detecta el malware automatizado de uso amplio.
+**Retención.** Debian trae `max_log_file = 8` (MB) y `num_logs = 5`, unos 40 MB. Con `root_exec`, cada orden lanzada con `sudo` registra todo lo que ejecuta, y una tarde de `apt install` rota los 40 MB en minutos y borra el registro del despliegue.[^audit-rotacion] Para 320 MB (32 MB × 10):
 
 ```bash
-sudo apt install -y rkhunter
-
-# Crear/agregar overrides locales
-sudo tee -a /etc/rkhunter.conf.local > /dev/null <<'EOF'
-# Override: PermitRootLogin está en sshd_config.d/01-hardening.conf
-ALLOW_SSH_ROOT_USER=unset
-ALLOW_SSH_PROT_V1=2
-
-# Whitelist de archivos ocultos legítimos del sistema
-ALLOWHIDDENFILE=/etc/.updated
-EOF
-
-# Verificar la configuración antes de escanear
-sudo rkhunter -C
+sudo grep -E '^(max_log_file|num_logs|max_log_file_action) ' /etc/audit/auditd.conf
+sudo sed -i -E 's/^max_log_file = .*/max_log_file = 32/; s/^num_logs = .*/num_logs = 10/' /etc/audit/auditd.conf
+sudo systemctl restart auditd
+sudo grep -E '^(max_log_file|num_logs) ' /etc/audit/auditd.conf
 ```
 
-**Inicialización:** establecer la línea base (hashes "buenos" de los binarios del sistema):
+`max_log_file_action` debe seguir en `ROTATE`, o `num_logs` no se aplica. El total se ajusta al espacio de `/var/log`, porque al llenarse actúan `space_left_action` y `disk_full_action`. El `sed` se puede repetir. `auditd.conf` no admite drop-ins: es un conffile, y como `journald.conf` en 18.1.1, `debsums -ac` (14.2) lo lista y una versión nueva del archivo hace que `unattended-upgrades` aparte `auditd`.
 
-```bash
-sudo rkhunter --propupd
-```
+[^audit-rotacion]: En un VPS de referencia, las instalaciones de las secciones 19 y 21 provocaron cuatro rotaciones en 18 minutos. Al terminar el despliegue, el registro más antiguo que quedaba era del mediodía de ese mismo día, posterior a casi todo el hardening.
 
-Esto debe ejecutarse inmediatamente después de la instalación inicial o de cualquier `apt upgrade` de lo contrario, los upgrades aparecen como modificaciones sospechosas.
+#### 14.2 `debsums` — integridad de paquetes
 
-**Escaneo manual:**
-
-```bash
-sudo rkhunter --check --skip-keypress
-```
-
-**Escaneo automático.** El paquete instala un job en `/etc/cron.daily/rkhunter`. Verificar que está activo y que los reportes llegan a algún sitio (correo del root local, syslog):
-
-```bash
-sudoedit /etc/default/rkhunter
-```
-
-```
-CRON_DAILY_RUN="true"
-CRON_DB_UPDATE="true"
-DB_UPDATE_EMAIL="true"
-REPORT_EMAIL="root"
-APT_AUTOGEN="true"
-```
-
-`APT_AUTOGEN="true"` regenera la base de hashes después de cada `apt upgrade`, evitando falsos positivos por actualizaciones legítimas.
-
-#### 12.3 `debsums` — integridad de paquetes
-
-`debsums` compara los hashes de los archivos instalados contra los registrados en los paquetes Debian. Detecta modificaciones de archivos que pertenecen a paquetes (binarios, configs por defecto).
+**Opcional, recomendado.** Compara los archivos instalados con los hashes de sus paquetes.
 
 ```bash
 sudo apt install -y debsums
@@ -2731,8 +2580,18 @@ sudo apt install -y debsums
 sudo debsums -ac
 ```
 
-- `-a` — incluye archivos de configuración.
-- `-c` — solo muestra los que difieren del original.
+`-a` incluye los archivos de configuración y `-c` muestra solo los que difieren. Siguiendo este manual, salen solo los modificados a propósito:
+
+```text
+/etc/security/faillock.conf
+/etc/security/pwquality.conf
+/etc/login.defs
+/etc/audit/auditd.conf
+```
+
+El primero es de 9.3.3, los dos siguientes de 9.4 y el último de la retención de 14.1. Los archivos de `/etc/default/` que se editan más adelante (`debsums` aquí mismo y `aide` en 14.3) es de esperar que aparezcan también en ejecuciones posteriores, pendiente de validación. Cualquier otro merece revisión.
+
+> `sshd_config` y los `common-*` de PAM no aparecen porque no son conffiles registrados por `dpkg`: el primero lo gestiona `ucf` y los segundos `pam-auth-update`. Los vigila AIDE (14.3).
 
 **Escaneo automático:**
 
@@ -2740,19 +2599,15 @@ sudo debsums -ac
 sudoedit /etc/default/debsums
 ```
 
-```
+```text
 CRON_CHECK=daily
 ```
 
-Esto deja un job en `/etc/cron.daily/debsums` que ejecuta el chequeo y manda el reporte por correo a root.
+El job de `/etc/cron.daily/debsums` usa `debsums -cs`, sin `-a`: solo escribe, y por tanto solo genera correo, cuando cambia un archivo de paquete. Los conffiles quedan para el `debsums -ac` manual y para AIDE.
 
-> `debsums` complementa a `rkhunter`: el primero detecta modificaciones en archivos de paquetes Debian (lo que un atacante podría parchear); el segundo busca binarios sospechosos que **no** pertenecen a ningún paquete.
+#### 14.3 AIDE — integridad de archivos del sistema
 
-#### 12.4 AIDE — integridad de archivos del sistema
-
-AIDE (*Advanced Intrusion Detection Environment*) crea una "fotografía" criptográfica del sistema (hashes, permisos, propietarios, tamaños) y permite detectar cualquier modificación posterior. Es la línea de defensa que avisa si un atacante modificó un binario, agregó un backdoor o alteró un archivo de configuración después de un compromiso.
-
-La contrapartida es que la base hay que rehacerla cada vez que el sistema cambia de forma legítima. El caso más frecuente no es una instalación de paquetes puntual sino un point release, que recompila binarios de base y desfasa la base completa. El procedimiento está en §14.9 y conviene leerlo antes de dejar el reporte diario configurado, porque un reporte con miles de diferencias se ignora y un control que se ignora no existe.
+**Opcional, recomendado.** Toma una foto criptográfica del sistema (hashes, permisos, propietarios) y avisa de cualquier cambio posterior, como un binario sustituido o una configuración alterada. A cambio, la base se rehace tras cada cambio legítimo; el caso más pesado es un point release (16.9). Un informe con miles de diferencias se ignora, y un control ignorado no existe.
 
 ##### Instalación
 
@@ -2760,21 +2615,38 @@ La contrapartida es que la base hay que rehacerla cada vez que el sistema cambia
 sudo apt install -y aide aide-common
 ```
 
-El paquete `aide` provee el binario; `aide-common` provee el archivo de configuración base (`/etc/aide/aide.conf`), el script de inicialización (`aideinit`) y el job diario (`/usr/share/aide/bin/dailyaidecheck`).
+`aide` es el binario; `aide-common` trae `/etc/aide/aide.conf`, `aideinit` y `dailyaidecheck`.
 
-> **Almacenamiento de contenedores.** Si el servidor corre contenedores, su almacenamiento cambia en cada despliegue y no es un árbol que AIDE deba vigilar: las capas de imagen y los volúmenes llenan el reporte diario de diferencias legítimas hasta volverlo ilegible. Se excluye con una regla propia antes de generar la base, y se comprueba que la configuración sigue siendo válida:
+> **Contenedores.** Sus capas e imágenes cambian en cada despliegue y llenan el informe. Se excluyen antes de generar la base:
 >
 > ```bash
 > printf '%s\n' '!/var/lib/docker' '!/var/lib/containerd' \
->   | sudo tee /etc/aide/aide.conf.d/70_local_contenedores > /dev/null
+>   | sudo install -m 0644 -o root -g root /dev/stdin /etc/aide/aide.conf.d/70_local_contenedores
 > sudo aide --config /etc/aide/aide.conf --config-check && echo "✓ configuración válida"
 > ```
 >
-> El nombre del archivo solo admite letras, números, guiones y guiones bajos; con un punto, AIDE lo ignora sin avisar. La integridad de lo que corre dentro de los contenedores se controla por otra vía, fijando cada imagen por su resumen criptográfico, y lo documenta el manual del rol.
+> El nombre del archivo solo admite letras, números, guiones y guiones bajos; con un punto, AIDE lo ignora sin avisar. La integridad de los contenedores se controla fijando cada imagen por su resumen, en el manual del rol.
+
+##### Exclusión del ruido propio de este servidor
+
+Debian ya trata como volátiles casi todas las rutas de `/var/log` y `/run`, pero no cuatro que genera este manual:
+
+```bash
+printf '%s\n' '!/var/log/sudo-io' '!/var/log/audit' '!/var/log/aide/aideinit\.log$' \
+  | sudo install -m 0644 -o root -g root /dev/stdin /etc/aide/aide.conf.d/70_local_logs
+printf '%s\n' '!/run/faillock' \
+  | sudo install -m 0644 -o root -g root /dev/stdin /etc/aide/aide.conf.d/70_local_run
+sudo aide --config /etc/aide/aide.conf --config-check && echo "✓ configuración válida"
+```
+
+- `/var/log/sudo-io`: un directorio nuevo por cada `sudo` (9.3.1), con retención propia en 18.2.1.
+- `/var/log/audit`: crece sin parar y lo protege `auditd` (14.1).
+- `/var/log/aide/aideinit.log`: se escribe después de la foto y, con `COPYNEWDB=no`, saldría todos los días. El punto escapado y el `$` limitan la exclusión a ese archivo, y los informes del mismo directorio siguen vigilados.
+- `/run/faillock`: `pam_faillock` (9.3.3) lo actualiza en cada `sudo`.
 
 ##### Inicialización de la base de datos
 
-El comando `aideinit` genera la base de datos inicial recorriendo todo el sistema y calculando hashes. Tarda entre **2 y 10 minutos** dependiendo del tamaño del sistema:
+Recorre todo el sistema y tarda **entre 2 y 10 minutos**:
 
 ```bash
 sudo aideinit
@@ -2782,35 +2654,33 @@ sudo aideinit
 
 Salida esperada:
 
-```
+```text
 Running aide --init...
 ```
 
-La base recién creada queda en `/var/lib/aide/aide.db.new`. Para que AIDE la use como referencia, hay que renombrarla a `aide.db`:
+La base queda en `aide.db.new` y se renombra para usarla como referencia:
 
 ```bash
 sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
 ```
 
-> **Nota sobre la compresión**: la configuración por defecto de Debian 13 incluye `gzip_dbout=yes`, lo que significa que la base de datos se genera comprimida con gzip aunque el archivo no tenga la extensión `.gz`. Esto es normal y AIDE la lee correctamente. Se puede verificar con `sudo file /var/lib/aide/aide.db`, que reportará `gzip compressed data`.
+> Con `gzip_dbout=yes`, la base sale comprimida aunque no lleve `.gz`; `sudo file /var/lib/aide/aide.db` dice `gzip compressed data`.
 
 ##### Verificación de la base de datos
-
-Antes de ejecutar el primer check, confirmar que todo está en orden:
 
 ```bash
 sudo ls -la /var/lib/aide/
 ```
 
-Salida esperada, los permisos restrictivos son parte del hardening:
+Salida esperada:
 
-```
+```text
 drwx------  2 _aide root      4096 set 12 21:25 .
 drwxr-xr-x 28 root  root      4096 set 12 21:19 ..
 -rw-------  1 _aide _aide 12761927 set 12 21:25 aide.db
 ```
 
-El directorio y el archivo pertenecen al usuario de sistema `_aide` (sin shell de login) con permisos `700` y `600` respectivamente. Solo `_aide` y `root` pueden acceder.
+Directorio y base son de `_aide`, sin shell, con `700` y `600`.
 
 ##### Ejecución del primer check
 
@@ -2818,21 +2688,19 @@ El directorio y el archivo pertenecen al usuario de sistema `_aide` (sin shell d
 sudo aide --config /etc/aide/aide.conf --check
 ```
 
-El check tarda entre 2 y 10 minutos. La terminal parecerá colgada mientras AIDE hashea cada archivo monitoreado — no interrumpir el comando con Ctrl+C.
+Tarda lo mismo que la inicialización y parece colgado; no se interrumpe.
 
 ##### Salida esperada
 
-Hay dos resultados posibles, ambos aceptables en la primera corrida:
+**A) Sin diferencias:**
 
-**A) Sin diferencias (ideal):**
-
-```
+```text
 AIDE 0.19.1 found NO differences between database and filesystem. Looks okay!!
 ```
 
-**B) Con diferencias menores (común en la primera corrida):**
+**B) Con diferencias menores, habituales en la primera corrida:**
 
-```
+```text
 Summary:
   Total number of entries:    XXXXX
   Added entries:              X
@@ -2840,63 +2708,80 @@ Summary:
   Changed entries:            Y
 ```
 
-Si aparecen diferencias, típicamente serán en:
+En el despliegue de referencia, sin las exclusiones todavía, salieron 21 añadidas, 1 eliminada y 8 cambiadas, todas cubiertas por las exclusiones salvo esta:
 
-- `/var/log/*` — logs que se escribieron entre `aideinit` y el `--check`.
-- `/var/lib/aide/aide.db` — la propia base de datos (porque fue movida con `mv` después de crearla).
-- `/var/cache/*`, `/var/lib/dpkg/*` — caché del sistema que cambia constantemente.
-- `/etc/.updated` — archivo legítimo del sistema gestionado por `base-files`.
+```text
+f------------------: /var/lib/aide/aide.db.new
+```
 
-Estas diferencias son normales y esperables. Indican que el sistema está vivo (escribiendo logs, actualizando timestamps), no que haya un problema de seguridad.
+Viene del `mv`. Con las exclusiones puestas debería ser la única diferencia del primer check, pendiente de validar en un despliegue que las aplique desde el principio. Si aparecen rutas de `/var/log/sudo-io`, `/var/log/audit`, `aideinit.log` o `/run/faillock`, falta una exclusión o el archivo tiene un punto en el nombre. Cualquier otra ruta, sobre todo en `/etc`, `/usr` o `/boot`, se revisa antes de regenerar, porque una base nueva sella como bueno lo que haya.
 
 ##### Regenerar el baseline tras el primer check
 
-Si el primer check reportó diferencias menores legítimas, regenerar la base como nuevo punto de referencia limpio:
-
 ```bash
-# Regenerar la base de datos
-sudo aide --config /etc/aide/aide.conf --init
-
-# Reemplazar la base actual con la nueva
-sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
-
-# Verificar que ahora no hay diferencias
+sudo aideinit -y -f
 sudo aide --config /etc/aide/aide.conf --check
 ```
 
-A partir de este momento, cualquier diferencia futura entre la base y el sistema indicará un cambio real que merece atención.
+`-y` sobrescribe un `aide.db.new` previo y `-f` lo copia sobre `aide.db`. `aideinit`, el envoltorio de Debian, ejecuta AIDE como `_aide`, igual que el check diario, y registra en `/var/log/aide/aideinit.log`.
+
+```text
+-rw-------  1 root  root  11094453 oct 17 10:15 aide.db
+-rw-------  1 _aide _aide 11094453 oct 17 10:15 aide.db.new
+```
+
+Quedan los dos archivos iguales, y `aide.db` pasa a root porque `aideinit` lo copia como root. El check diario lo lee igual gracias a `CAP_DAC_READ_SEARCH` y, con `COPYNEWDB=no`, nunca lo escribe. Desde aquí, toda diferencia es un cambio real.
 
 ##### Programación del check diario automático
 
-El paquete `aide-common` provee `/usr/share/aide/bin/dailyaidecheck` y un cronjob en `/etc/cron.daily/`. Verifica que esté activado:
+Lo lanza `dailyaidecheck.timer`, habilitado por el paquete. El `/etc/cron.daily/dailyaidecheck` termina sin hacer nada en sistemas con systemd, para no duplicar el check:
 
 ```bash
-ls -la /etc/cron.daily/ | grep -i aide
-sudo cat /etc/default/aide
+systemctl list-timers dailyaidecheck.timer
 ```
 
-Para activar el check diario automático, asegurarse de tener en `/etc/default/aide`:
+Debe aparecer la próxima ejecución:
+
+```text
+Sun 2026-10-18 02:15:07 -05       16h -                                      - dailyaidecheck.timer         dailyaidecheck.service
+```
+
+El timer está a las 01:50 con `RandomizedDelaySec=2h` y `Persistent=true`, así que la hora varía y un servidor apagado lo ejecuta al arrancar. `CRON_DAILY_RUN` viene comentada y vale `yes`; solo se descomenta para desactivar el check.
+
+El servicio corre como `_aide`, con `COMMAND=update` y `COPYNEWDB=no`: compara contra `aide.db`, deja `aide.db.new` y envía el informe a root, cada día aunque no haya cambios. Un correo diario que casi siempre dice "sin cambios" se deja de leer, así que se limita a los días con diferencias o errores:
 
 ```bash
-sudo sed -i 's|^CRON_DAILY_RUN=.*|CRON_DAILY_RUN=yes|' /etc/default/aide
+sudo sed -i 's|^#\?QUIETREPORTS=.*|QUIETREPORTS=yes|' /etc/default/aide
+grep -n '^QUIETREPORTS' /etc/default/aide
 ```
 
-El cron diario ejecuta el check, registra el resultado en `/var/log/aide/aide.log` y envía un correo a root con el reporte si hay diferencias (configurable en `/etc/default/aide`).
+```text
+21:QUIETREPORTS=yes
+```
+
+`^#\?` cubre la línea comentada y la ya descomentada, y no hace falta reiniciar nada. El informe completo queda en `/var/log/aide/aide.log`, rotado cada día; en el journal solo constan el inicio y el final de cada ejecución.
 
 ##### Mantenimiento tras cambios legítimos
 
-Cada vez que se actualicen paquetes (`apt upgrade`), se modifique la configuración o se instale software, AIDE reportará diferencias en el próximo check. Esto es esperado. Después de validar que los cambios son legítimos, regenera la base:
+Tras actualizar paquetes, cambiar la configuración o instalar software, el siguiente check muestra diferencias. Validadas, se regenera la base:
 
 ```bash
-sudo aide --config /etc/aide/aide.conf --init
-sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+sudo aideinit -y -f
 ```
 
-Guarda una copia de la base de datos en un medio externo o de solo lectura. Si un atacante compromete el sistema, podría modificar tanto los binarios como la base de datos local de AIDE para ocultar el rastro. Una copia offline es la única referencia confiable.
+Se guarda además una copia de la base fuera del servidor o en un medio de solo lectura: un atacante con root puede alterar binarios y base a la vez.
 
-#### 12.5 Revisión periódica de logs y registros
+#### 14.4 Revisión periódica de logs y registros
 
-Aunque las herramientas anteriores generan reportes automáticos, conviene tener el hábito de revisar manualmente:
+En Debian 13 `last` está en el paquete `wtmpdb`, con la base en `/var/log/wtmp.db`. `sshd` registra sus sesiones por su cuenta, y `libpam-wtmpdb` añade `su` y la consola con `skip_if=sshd` para no duplicarlas:
+
+```bash
+sudo apt install -y wtmpdb libpam-wtmpdb
+diff <(grep -vE '^\s*#|^\s*$' /etc/pam.d/common-auth.faillock) \
+     <(grep -vE '^\s*#|^\s*$' /etc/pam.d/common-auth) && echo "✓ pila de faillock intacta"
+```
+
+Al ser un `libpam-*`, pasa por `pam-auth-update`: se responde "Sí" al diálogo y se aplica la comprobación de la ATENCIÓN de 9.3.3.
 
 ```bash
 # Últimos logins exitosos
@@ -2909,15 +2794,18 @@ sudo wtmpdb last --fulltimes --service -n 20
 sudo journalctl SYSLOG_FACILITY=10 -p warning --since '7 days ago' | tail -30
 
 # Eventos SSH específicos de los últimos 7 días
-sudo journalctl -u ssh --since '7 days ago' | grep -iE 'fail|invalid|preauth' | tail -20
+sudo journalctl -u ssh --since '7 days ago' | grep -iE 'fail|invalid|preauth' \
+  | grep -v 'Postponed publickey' | tail -20
 
 # Warnings y errores del sistema del día actual
 sudo journalctl --since today -p warning..emerg --no-pager
 ```
 
-#### 12.6 `lynis` — auditoría periódica del baseline de seguridad
+El segundo `grep` de la consulta de SSH quita los `Postponed publickey ... [preauth]`, un paso normal de cada inicio con llave que, sin filtrar, ocupaba 16 de 20 líneas. Lo que queda son conexiones cerradas antes de autenticarse, `Too many authentication failures` y escáneres que no completan el banner (`banner exchange: ... invalid format`).
 
-Las herramientas anteriores detectan cambios en archivos (AIDE), rootkits conocidos (rkhunter) e integridad de paquetes (debsums). `lynis` cubre un ángulo distinto: audita la *configuración* del sistema contra un conjunto de mejores prácticas de seguridad y genera un reporte con puntuación y sugerencias concretas. Es útil como auditoría periódica para detectar derivas en la configuración del servidor.
+#### 14.5 `lynis` — auditoría periódica del baseline de seguridad
+
+**Opcional, recomendado** al menos una vez tras el despliegue. Audita la configuración contra buenas prácticas y da una puntuación con sugerencias; sirve para detectar derivas.
 
 ```bash
 sudo apt install -y lynis
@@ -2929,69 +2817,99 @@ sudo apt install -y lynis
 sudo lynis audit system
 ```
 
-La salida incluye una sección `Hardening index` con la puntuación (0–100), y secciones `Suggestions` y `Warnings` con las recomendaciones. En un servidor recién desplegado siguiendo este manual, la puntuación típica oscila entre 70 y 80 puntos; los puntos restantes corresponden a configuraciones avanzadas de compliance (AppArmor profiles personalizados, auditd con reglas exhaustivas, etc.) que van más allá del baseline generalista.
+`Hardening index` va de 0 a 100. En el despliegue de referencia, con el manual aplicado hasta 14.4: `Great, no warnings`, índice 81 y 29 sugerencias. La puntuación no es un objetivo; conviene saber qué sugerencias no se persiguen.
 
-**Auditoría automática mensual:**
+No aplican, porque el manual ya lo cubre o lynis lo lee mal:
+
+- SSH-7408 sobre `AllowTcpForwarding`, `X11Forwarding` y `AllowAgentForwarding`: `DisableForwarding yes` (10.4) prevalece sobre todas.
+- FINT-4402, SHA256 o SHA512 en AIDE: `Checksums = H` los incluye.
+- KRNL-5788, falta `/vmlinuz`: las imágenes cloud traen `do_symlinks = no`; los kernels están en `/boot`.
+- HRDN-7222, compilador instalado: suele ser `as`, de `binutils`, llegado como dependencia; `dpkg -S /usr/bin/as` dice de dónde.
+- "Non-native binary formats": el `binfmt` de `python3.13` para los `.pyc`.
+- AUTH-9230, rondas de hash: `SHA_CRYPT_*` solo afecta a SHA-512, y Debian 13 usa yescrypt.
+- BOOT-5180 y FIRE-4513: informativas.
+- `[LYNIS]`, versión antigua: ver más abajo.
+
+Se descartan a propósito:
+
+- SSH-7408, `MaxSessions 2`: con `ControlMaster` (10.4) la tercera terminal fallaría.
+- SSH-7408, `TCPKeepAlive no`: `ClientAlive*` ya detecta las conexiones muertas.
+- FILE-7524, permisos 600/700 en `grub.cfg`, `crontab`, `sshd_config` y `/etc/cron.*`: no tienen secretos, y `update-grub` y `cron` podrían revertirlos (no comprobado).
+- BOOT-5122 y FILE-6310, contraseña de GRUB y particiones propias: no compensan en un VPS de disco único.
+- BOOT-5264, endurecer unidades con `systemd-analyze security`: trabajo por servicio, de cada manual de rol.
+- DEB-0280, `libpam-tmpdir`: otro `libpam-*` por una mejora pequeña.
+- USB-1000: un VPS no tiene USB.
+- LOGG-2154, ACCT-9622, ACCT-9626, TOOL-5002, BANN-7126, BANN-7130, DEB-0810 y PKGS-7394: dependen del rol o de la política del cliente.
+
+Aplicadas: `UMASK 027` (AUTH-9328, 9.4) y `ldisc_autoload` y `bpf_jit_harden` (KRNL-6000, 13.1).
+
+**Auditoría mensual:**
 
 ```bash
-sudo tee /etc/cron.monthly/lynis-audit > /dev/null <<'EOF'
+sudo install -m 0700 -o root -g root /dev/stdin /etc/cron.monthly/lynis-audit <<'EOF'
 #!/bin/bash
 /usr/sbin/lynis audit system --quiet --cronjob 2>&1 \
   | { printf 'To: root\nSubject: Lynis audit %s %s\n\n' "$(hostname)" "$(date +%Y-%m)"; cat; } \
   | /usr/sbin/sendmail -t
 EOF
-sudo chmod 700 /etc/cron.monthly/lynis-audit
-sudo chown root:root /etc/cron.monthly/lynis-audit
 ```
 
-La opción `--cronjob` suprime la salida interactiva; `--quiet` elimina el progreso visual. El reporte llega por correo a root (y por lo tanto al destino externo configurado en la sección 19).
-
-> El envío no usa `mail -s asunto root` por la razón documentada en 19.9: GNU
-> Mailutils invoca `/usr/sbin/sendmail -t` sin pasarle el destinatario posicional,
-> de modo que msmtp nunca llega a ejecutarse y el correo se pierde en silencio. La
-> forma confiable es construir las cabeceras `To:` y `Subject:` y entregárselas a
-> `/usr/sbin/sendmail -t`, con la ruta completa porque `/usr/sbin` no está en el
-> `$PATH` de un cron de usuario.
-
-**Actualización de la base de datos de lynis:**
+El informe llega por correo a root y, con la sección 21, al destino externo. El paquete instala además un `lynis.timer` diario que deja el resultado en el log sin enviar nada; sobra junto al cron mensual:
 
 ```bash
-sudo lynis update info   # ver versión actual y disponible
-sudo apt upgrade -y lynis   # actualizar desde los repositorios Debian
+sudo systemctl disable --now lynis.timer
+systemctl is-enabled lynis.timer   # debe devolver "disabled"
 ```
 
-> lynis no modifica el sistema: solo audita y reporta. Es seguro ejecutarlo en cualquier momento sin riesgo de alterar la configuración.
+> No se usa `mail -s asunto root` por lo explicado en 21.9: GNU Mailutils invoca `sendmail -t` sin el destinatario posicional y el correo se pierde. Se construyen las cabeceras `To:` y `Subject:` y se pasan a `/usr/sbin/sendmail -t`, con ruta completa porque `/usr/sbin` no está en el `$PATH` de cron.
 
-### 13. AppArmor
+**Versión de lynis:**
 
-AppArmor es el sistema de Mandatory Access Control (MAC) que Debian usa por defecto desde Buster. Confina procesos: cada perfil declara qué archivos puede leer, escribir y ejecutar un programa, qué capabilities puede usar, qué red puede tocar. Si un atacante explota un servicio confinado, el perfil limita el daño.
+```bash
+sudo lynis update info
+```
 
-A diferencia de SELinux (Red Hat), AppArmor identifica programas por ruta del binario, lo que lo hace más simple de entender y mantener.
+```text
+  Version            : 3.1.4
+  Status             : Outdated
+  Installed version  : 314
+  Latest version     : 316
+```
 
-En Debian 13 Trixie, AppArmor viene activo por defecto y con perfiles cargados para servicios comunes (Avahi, CUPS, ntpd, parts of systemd, etc.). El trabajo de hardening aquí es: confirmar que está activo, entender el estado, y considerar añadir perfiles adicionales.
+`Outdated` es lo esperable: Debian estable mantiene la versión de trixie con correcciones de seguridad, y lynis se compara con la última de CISOfy; de ahí también la sugerencia `[LYNIS]`. Se actualiza con el sistema (16.9). lynis no modifica nada, solo audita.
 
-#### 13.1 Verificación del estado
+### 15. AppArmor
+
+AppArmor confina procesos por la ruta del binario: cada perfil declara qué puede leer, escribir y ejecutar un programa. En Debian 13 viene activo, pero en un servidor base no confina nada en marcha: sus perfiles son de escritorio y de herramientas sueltas, y los servicios de este manual (`sshd`, `fail2ban`, `cron`, `auditd`) no tienen perfil. El confinamiento llega con los roles, como Docker con `docker-default` o libvirt con cada VM. Aquí se confirma que está activo y se dejan las herramientas listas.
+
+#### 15.1 Verificación del estado
 
 ```bash
 sudo aa-status
 ```
 
-Salida típica:
+Salida en el despliegue de referencia, recortada:
 
-```
+```text
 apparmor module is loaded.
-N profiles are loaded.
-M profiles are in enforce mode.
-K profiles are in complain mode.
-P processes have profiles defined.
-...
+106 profiles are loaded.
+7 profiles are in enforce mode.
+   /usr/bin/man
+   lsb_release
+   ...
+23 profiles are in complain mode.
+   ...
+76 profiles are in unconfined mode.
+   ...
+0 processes have profiles defined.
+0 processes are in enforce mode.
+0 processes are in complain mode.
 ```
 
-**Interpretación:**
-
-- `enforce mode` — el perfil bloquea cualquier acción que no permita explícitamente. Es el modo "real".
-- `complain mode` — el perfil registra violaciones en el log pero no bloquea. Útil para depurar perfiles nuevos.
-- `unconfined` — el proceso ejecuta sin perfil aplicado (la mayoría de los procesos del sistema, salvo los servicios con perfil empaquetado).
+- `enforce mode`: el perfil bloquea lo que no permite.
+- `complain mode`: registra las violaciones sin bloquear.
+- `unconfined mode`: perfiles con `flags=(unconfined)`, como `firefox` o `runc`, que AppArmor 4 usa para permitir espacios de nombres de usuario. No restringen nada.
+- `processes have profiles defined`: lo que dice si algo está confinado. En el servidor base es 0. Para un servicio concreto, `cat /proc/$(pgrep -o -x sshd)/attr/current`.
 
 Si AppArmor no está cargado:
 
@@ -3000,123 +2918,114 @@ sudo systemctl status apparmor --no-pager
 sudo systemctl enable --now apparmor
 ```
 
-Verificar también el parámetro de boot del kernel:
+Y en el kernel:
 
 ```bash
 cat /sys/kernel/security/lsm
 ```
 
-La salida debe incluir `apparmor` en la lista (típicamente junto con `lockdown`, `capability`, `landlock`, `yama` y otros). Si aparece, AppArmor está cargado y operativo.
+La lista debe incluir `apparmor`.
 
-#### 13.2 Perfiles en `enforce` vs `complain`
+#### 15.2 Perfiles en `enforce` vs `complain`
 
-Inspeccionar perfiles individualmente:
+`aa-complain`, `aa-enforce` y el resto vienen en `apparmor-utils`:
+
+```bash
+sudo apt install -y apparmor-utils
+```
 
 ```bash
 sudo aa-status | grep -A100 'profiles are in'
 ```
 
-**Mover un perfil a complain (para depurar problemas):**
+**A complain, para depurar:**
 
 ```bash
-sudo aa-complain /etc/apparmor.d/<perfil>
+export PERFIL=usr.bin.msmtp   # archivo del perfil en /etc/apparmor.d/
+sudo aa-complain "/etc/apparmor.d/${PERFIL:?}"
 ```
 
-**Volver a enforce:**
+**De vuelta a enforce:**
 
 ```bash
-sudo aa-enforce /etc/apparmor.d/<perfil>
+sudo aa-enforce "/etc/apparmor.d/${PERFIL:?}"
 ```
 
-**Recargar todos los perfiles:**
-
-```bash
-sudo systemctl reload apparmor
-```
-
-#### 13.3 Añadir perfiles adicionales
-
-El paquete base de AppArmor en Debian incluye perfiles esenciales. El paquete `apparmor-profiles` añade perfiles para más programas (Firefox, Apache, MariaDB, PostgreSQL, etc.), y `apparmor-profiles-extra` aporta perfiles experimentales adicionales.
-
-```bash
-sudo apt install -y apparmor-profiles apparmor-profiles-extra apparmor-utils
-```
-
-Tras instalar:
+**Recargar todos:**
 
 ```bash
 sudo systemctl reload apparmor
-sudo aa-status
 ```
 
-El número de perfiles cargados aumenta. Algunos perfiles vienen en `complain` mode por defecto (para que no rompan nada al instalarlos sin probar). Tras un período de operación normal, revisar el log:
+#### 15.3 Perfiles adicionales
+
+`apparmor-profiles` y `apparmor-profiles-extra` solo se instalan si el rol ejecuta alguno de sus programas; en un servidor genérico añaden perfiles sin confinar nada (en el despliegue de referencia, de 106 a 135 perfiles con `0 processes have profiles defined`). Para comprobar si alguno corresponde a un binario del servidor:
 
 ```bash
-sudo journalctl -k | grep -i apparmor | grep DENIED | head -50
+apt-get download apparmor-profiles apparmor-profiles-extra
+for d in apparmor-profiles*.deb; do dpkg -c "$d" | grep -o 'etc/apparmor.d/[^/]\+$'; done
+rm -f apparmor-profiles*.deb
 ```
 
-Si un perfil no genera denegaciones legítimas durante días de uso normal, se puede pasar a enforce con `aa-enforce`.
+Si se instalan, tras unos días de uso se buscan denegaciones:
 
-Crear perfiles propios para aplicaciones custom (un script, un binario propio, un servicio interno) requiere `aa-genprof` y comprensión del modelo de AppArmor. Es un nivel de hardening avanzado, pertinente cuando el servidor expone una aplicación específica de alto valor.
+```bash
+if systemctl is-active --quiet auditd; then
+  sudo grep -h 'apparmor="DENIED"' /var/log/audit/audit.log* | tail -50
+else
+  sudo journalctl -k | grep 'apparmor="DENIED"' | tail -50
+fi
+```
+
+Con `auditd` activo, el kernel entrega los mensajes de AppArmor a `/var/log/audit/audit.log` y no los escribe en `journalctl -k`, donde solo quedan los del arranque previo a `auditd`. Un perfil en `complain` sin denegaciones legítimas puede pasar a enforce. Si se instalaron sin necesidad, se purgan, y `sudo aa-remove-unknown` descarga los perfiles que ya no tienen archivo (pendiente de validar). Los perfiles propios, con `aa-genprof`, son trabajo del manual del rol.
 
 ### Cierre de la Etapa III
 
-Al terminar esta parte, el servidor está endurecido en sus capas críticas:
-
 - **Acceso (SSH):** puerto cambiado, solo llave pública, usuarios restringidos, criptografía moderna.
-- **Red (UFW):** denegación por defecto, solo SSH abierto, rate limiting integrado.
-- **Fuerza bruta (fail2ban):** baneo automático por patrones de log, escalado para reincidentes.
-- **Kernel (sysctl, modprobe):** parámetros anti-spoofing, ASLR, módulos innecesarios bloqueados.
-- **Auditoría (auditd, rkhunter, debsums, AIDE):** registro y verificación de integridad.
-- **MAC (AppArmor):** confinamiento de procesos críticos.
+- **Red (UFW y proveedor):** denegación por defecto, solo SSH abierto, con rate limiting.
+- **Fuerza bruta (fail2ban):** baneo por patrones de log, creciente para reincidentes.
+- **Kernel (sysctl, modprobe):** anti-spoofing, ASLR, módulos innecesarios bloqueados.
+- **Auditoría (auditd, debsums, AIDE):** registro y verificación de integridad.
+- **MAC (AppArmor):** activo y listo para los perfiles que traigan los roles.
 
-El servidor sigue siendo administrable y funcional. Las capas añadidas son transparentes para el operador legítimo y costosas para un atacante.
-
-La Etapa IV (mantenimiento) se ocupa de mantener este estado en el tiempo: actualizaciones automáticas, sincronización de tiempo, rotación de logs, monitoreo, respaldos.
+Al terminar el despliegue base, UFW y el firewall del proveedor admiten solo SSH. La restricción de los puertos web a un proxy de borde se aplica después, con la sección 17 del manual de Caddy. La Etapa IV mantiene este estado en el tiempo.
 
 ---
 
 ## Etapa IV — Mantenimiento y actualizaciones
 
-Las partes I a III dejaron el servidor instalado, configurado y endurecido. Esta parte se ocupa de mantenerlo así en el tiempo. Un servidor endurecido en el día 1 deja de estarlo a los pocos meses si no se actualiza, si su reloj se desincroniza, si los logs desbordan el disco, si nadie repara en una caída de un servicio crítico, o si una falla de hardware sorprende sin un respaldo reciente.
+Un servidor endurecido el primer día deja de estarlo en pocos meses si no se actualiza, si su reloj deriva, si los logs llenan el disco, si nadie se entera de una caída o si un fallo llega sin respaldo. Esta etapa lo mantiene: actualizaciones, hora, logs, monitoreo mínimo, respaldos, correo y documentación. La observabilidad avanzada y los respaldos empresariales son de los manuales de rol. Cada automatismo deja rastro en logs o en correo, el reinicio automático va en una ventana horaria predecible, y la restauración se prueba antes de necesitarla.
 
-El alcance es deliberadamente operativo: actualizaciones automáticas razonables, sincronización de tiempo confiable, manejo de logs, monitoreo mínimo, y una estrategia de respaldos que pueda restaurar el servidor desde cero. No se cubren herramientas avanzadas de observabilidad (Prometheus, Grafana, ELK) ni soluciones de respaldo empresariales — pertenecen a manuales específicos cuando el rol del servidor lo justifique.
+### 16. Actualizaciones automáticas
 
-Tres principios atraviesan esta parte:
+Actualizar a mano no escala: quien lo olvida unas semanas tiene un servidor con CVE sin parchear durante semanas. `unattended-upgrades` aplica solo los orígenes indicados, admite exclusiones, avisa por correo y puede reiniciar en una ventana.
 
-1. La automatización debe ser auditable. Una tarea que corre sola y nadie revisa equivale a una tarea que no corre. Cada automatización de esta parte (apt-daily, chronyd, logrotate, borgbackup) deja huella verificable en logs o correos al administrador.
-
-2. El reinicio automático es un compromiso, no un dogma. Reiniciar para aplicar parches del kernel es necesario; reiniciar a mitad de jornada es destructivo. Esta parte propone ventanas horarias y banderas explícitas para que el comportamiento sea predecible.
-
-3. Probar la restauración antes de necesitarla. Un respaldo que nunca se restauró no es un respaldo, es una esperanza. La sección 18 incluye prueba periódica de restauración como parte del flujo, no como recomendación opcional.
-
-### 14. Actualizaciones automáticas
-
-Las actualizaciones manuales `apt update && apt full-upgrade` son apropiadas durante el despliegue inicial (sección 6) y para cambios mayores, pero no escalan en operación cotidiana. Un servidor administrado por una persona que olvida actualizar durante semanas es un servidor con CVEs sin parchear durante semanas.
-
-`unattended-upgrades` es el mecanismo estándar de Debian para aplicar actualizaciones automáticas con criterio: solo paquetes de orígenes específicos, con posibilidad de listas negras, con notificación por correo, y con reinicio automático opcional dentro de ventanas horarias.
-
-#### 14.1 Instalación
+#### 16.1 Instalación
 
 ```bash
 sudo apt install -y unattended-upgrades apt-listchanges
 ```
 
-`apt-listchanges` muestra los changelogs de los paquetes que se van a actualizar. En modo automático, los envía por correo a root antes de aplicar las actualizaciones. Es útil para detectar cambios disruptivos antes de que ocurran.
+Algunas imágenes los traen instalados y con el flujo ya activo (sección 5); entonces lo que sigue modifica un flujo que puede haber aplicado ya actualizaciones con los orígenes de serie. Se comprueba:
 
-#### 14.2 Configuración de orígenes
+```bash
+cat /etc/apt/apt.conf.d/20auto-upgrades
+sudo tail -n 5 /var/log/unattended-upgrades/unattended-upgrades.log
+```
 
-La configuración principal está en `/etc/apt/apt.conf.d/50unattended-upgrades`. El paquete viene con valores conservadores por defecto (solo `Debian-Security`). Esta sección lo amplía a security y updates, según la decisión documentada al inicio de la Etapa IV.
+`apt-listchanges` (con `which=news`, su valor de serie) envía las entradas de `NEWS.Debian`, donde los mantenedores avisan de cambios incompatibles, en la misma ejecución y segundos antes de instalar. No da margen para frenar nada, pero deja constancia de qué cambió.
 
-Editar el archivo:
+#### 16.2 Configuración de orígenes
+
+De serie, `/etc/apt/apt.conf.d/50unattended-upgrades` habilita el repositorio principal y seguridad y deja comentado `-updates`. Este manual lo activa.
 
 ```bash
 sudoedit /etc/apt/apt.conf.d/50unattended-upgrades
 ```
 
-En la sección `Unattended-Upgrade::Origins-Pattern` o `Unattended-Upgrade::Allowed-Origins`, dejar habilitadas las siguientes líneas (descomentándolas si vienen comentadas):
+En `Unattended-Upgrade::Origins-Pattern` o `Unattended-Upgrade::Allowed-Origins`, estas líneas activas:
 
-```
+```text
 Unattended-Upgrade::Origins-Pattern {
     "origin=Debian,codename=${distro_codename},label=Debian";
     "origin=Debian,codename=${distro_codename},label=Debian-Security";
@@ -3125,99 +3034,52 @@ Unattended-Upgrade::Origins-Pattern {
 };
 ```
 
-Significado:
+La primera es `trixie` (correcciones entre point releases), las dos siguientes `trixie-security` (dos formatos posibles de la metadata) y la cuarta `trixie-updates`. Con `-updates` el servidor recibe también correcciones funcionales, a cambio de más cambios entre reinicios. Donde pese más la estabilidad, basta con seguridad. En el manual base no se excluye ningún paquete; si un rol lo necesita, lo hace en `Unattended-Upgrade::Package-Blacklist`.
 
-- La primera línea cubre el repositorio principal `trixie` (correcciones de bugs entre point releases que llegan vía `main`).
-- Las dos siguientes cubren `trixie-security` (parches de seguridad). Aparecen duplicadas porque la metadata del repositorio puede usar dos formatos según el momento, y conviene cubrir ambos.
-- La cuarta cubre `trixie-updates` (actualizaciones que el equipo de release publica entre point releases).
-
-Aplicar `updates` además de `security` mantiene el servidor más al día (correcciones funcionales, no solo de seguridad), a cambio de mayor superficie de cambio entre reinicios. Es una decisión defendible para servidores administrados activamente. Para servidores donde la estabilidad importa más que la frescura, dejar solo `security` es válido — basta con comentar las líneas que no aplican.
-
-> **Los repositorios de terceros quedan fuera.** Estos patrones solo cubren los orígenes de Debian. Un paquete instalado desde un repositorio externo —un motor de contenedores, un proxy inverso, una base de datos empaquetada por su proveedor— no se actualiza solo, y eso incluye sus parches de seguridad. No conviene corregirlo a ciegas: en varios de esos paquetes la actualización reinicia el servicio, y hacerlo sin ventana puede ser peor que hacerlo unos días tarde. La decisión se toma por paquete en el manual del rol, y tiene dos salidas: añadir su origen a esta lista, o anotar su actualización como tarea periódica con responsable. Los valores para la primera se leen de la política de apt:
+> **Los repositorios de terceros quedan fuera.** Un paquete de un repositorio externo (motor de contenedores, proxy inverso, base de datos del fabricante) no se actualiza solo, ni siquiera con parches de seguridad. Como varios reinician su servicio al actualizarse, se decide por paquete en el manual del rol: añadir su origen a la lista o anotar su actualización como tarea periódica con responsable. Los orígenes se leen así:
 >
 > ```bash
 > apt-cache policy | grep -oE 'o=[^,]+' | sort -u
 > ```
 >
-> Cada `o=<valor>` es un origen, y la línea que se añade tiene la forma `"origin=<valor>";`.
+> Cada `o=<valor>` se añade como `"origin=<valor>";`.
 
-##### 14.2.1 Lista de paquetes excluidos
-
-`unattended-upgrades` permite excluir paquetes específicos del flujo automático. Esto es útil para paquetes que requieren intervención manual al actualizarse (por ejemplo, bases de datos en producción, donde el reinicio del servicio debe coordinarse).
+#### 16.3 Notificación por correo
 
 En el mismo archivo:
 
-```
-Unattended-Upgrade::Package-Blacklist {
-//  "vim";
-//  "libc6";
-//  "libc6-dev";
-//  "libc6-i686";
-};
-```
-
-En el manual base no se excluye ningún paquete. Los manuales específicos (mail, base de datos, web) pueden añadir exclusiones según el rol.
-
-#### 14.3 Notificación por correo
-
-Las actualizaciones automáticas sin notificación equivalen a actualizaciones invisibles. El administrador debe enterarse de qué se actualizó, qué falló, y qué requiere reinicio.
-
-En el mismo archivo `/etc/apt/apt.conf.d/50unattended-upgrades`, configurar:
-
-```
+```text
 Unattended-Upgrade::Mail "root";
 Unattended-Upgrade::MailReport "on-change";
 ```
 
-Significado:
+`MailReport "on-change"` envía solo cuando hubo actualizaciones o errores (`always` es ruidoso y `only-on-error` demasiado silencioso). Hasta configurar la sección 21, el correo queda en `/var/mail/root`.
 
-- `Mail "root"` — envía el reporte al usuario `root` local. Si el servidor tiene un MTA configurado para reenviar el correo de root a una dirección externa, llega ahí.
-- `MailReport "on-change"` — solo envía correo cuando hubo actualizaciones aplicadas o errores. Las opciones son `always` (siempre, ruidoso), `only-on-error` (solo errores, demasiado silencioso) y `on-change` (equilibrio razonable).
+#### 16.4 Reinicio automático controlado
 
-Para que el correo a root sea útil, hay que asegurar que se reenvía a una dirección real. Esto se cubre en la sección 19, con la configuración de un MTA mínimo. Mientras tanto, el correo queda en `/var/mail/root` y se puede leer con `mail` desde el servidor.
+Kernel, libc, OpenSSL o systemd solo se aplican al reiniciar; hasta entonces sigue corriendo el código vulnerable.
 
-#### 14.4 Reinicio automático controlado
-
-Algunos paquetes (kernel, libc, OpenSSL, systemd) requieren reinicio para que la actualización surta efecto. Sin reinicio, el sistema sigue ejecutando código vulnerable aunque el paquete nuevo esté instalado.
-
-`unattended-upgrades` puede reiniciar automáticamente, pero hay que controlarlo: un reinicio a las 14:00 de un martes en pleno horario laboral es destructivo, mientras que uno a primera hora de la mañana suele ser tolerable.
-
-En `/etc/apt/apt.conf.d/50unattended-upgrades`:
-
-```
+```text
 Unattended-Upgrade::Automatic-Reboot "true";
 Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
-Unattended-Upgrade::Automatic-Reboot-Time "07:00";
+Unattended-Upgrade::Automatic-Reboot-Time "07:30";
 ```
 
-Significado:
+`Automatic-Reboot-WithUsers "false"` pospone el reinicio si hay sesiones, pero la espera es silenciosa e indefinida: una sesión de `tmux` desasociada (6.4) puede dejar registro en `utmp` y bloquear el reinicio noche tras noche. `who` lo muestra.
 
-- `Automatic-Reboot "true"` — habilita el reinicio automático cuando es necesario.
-- `Automatic-Reboot-WithUsers "false"` — no reinicia si hay usuarios con sesión activa. Es una salvaguarda razonable: si alguien está trabajando en el servidor, el reinicio se pospone al siguiente ciclo.
+La hora va después de la actualización: `apt-daily-upgrade.timer` dispara a las 06:00 con hasta 60 minutos de retardo, y el reinicio espera a la siguiente `Automatic-Reboot-Time`. Con 04:00 se iría a la madrugada siguiente, con el kernel nuevo instalado y el viejo en marcha veintidós horas; con 07:00 pasa a veces; 07:30 deja margen. La hora es la de la zona de 7.3. Si un rol no admite el reinicio nocturno, se deja `Automatic-Reboot "false"` y su manual documenta los reinicios manuales.
 
-El costo de esa salvaguarda es que la postergación es silenciosa e indefinida. Una sesión de `tmux` desasociada como las de la sección 4.4 puede dejar registro en `utmp` y bloquear el reinicio noche tras noche, con el resultado de un servidor que lleva meses con un kernel vulnerable sin que nadie lo note. La comprobación es `who`: si devuelve sesiones que no corresponden a nadie trabajando, cerrarlas antes de esperar el ciclo automático.
-- `Automatic-Reboot-Time "07:00"` — hora a la que se ejecuta el reinicio (en la zona horaria del servidor configurada en la sección 5.3).
-
-La hora del reinicio va después de la actualización, no antes. `apt-daily-upgrade.timer` dispara a las 06:00 con hasta 60 minutos de retardo aleatorio, y el reinicio se programa para la siguiente ocurrencia de `Automatic-Reboot-Time`. Con 04:00 ese punto ya pasó y el reinicio queda para la madrugada siguiente: veintidós horas con el kernel nuevo instalado y el viejo en ejecución.
-
-Si el servidor tiene servicios donde el reinicio nocturno no es aceptable (por ejemplo, mail server con tráfico 24/7 que necesita coordinación con balanceador), la opción correcta es dejar `Automatic-Reboot "false"` y hacer los reinicios manualmente tras revisar la cola y notificar a usuarios. Esto se documenta en el manual del rol específico.
-
-Para detectar manualmente si hay reinicio pendiente:
+Reinicio pendiente:
 
 ```bash
 ls /var/run/reboot-required 2>/dev/null && cat /var/run/reboot-required.pkgs
 ```
 
-Si el archivo existe, hay reinicio pendiente. El segundo comando muestra qué paquetes lo requieren.
+El segundo comando dice qué paquetes lo piden.
 
-#### 14.5 Habilitación del flujo periódico
+#### 16.5 Habilitación del flujo periódico
 
-`unattended-upgrades` se ejecuta a través de timers de systemd, no de cron. Hay dos timers relevantes:
-
-- `apt-daily.timer` — corre dos veces al día. Hace `apt update` y descarga paquetes nuevos al caché local sin instalarlos.
-- `apt-daily-upgrade.timer` — corre una vez al día. Aplica las actualizaciones que `unattended-upgrades` autorice.
-
-Para que el flujo automático funcione, hay que asegurar que ambos timers están habilitados y que el archivo `20auto-upgrades` instruye a usar `unattended-upgrades`:
+`apt-daily.timer` actualiza las listas y descarga; `apt-daily-upgrade.timer` aplica lo que autoriza `unattended-upgrades`. Ambos necesitan `20auto-upgrades`:
 
 ```bash
 sudoedit /etc/apt/apt.conf.d/20auto-upgrades
@@ -3225,71 +3087,54 @@ sudoedit /etc/apt/apt.conf.d/20auto-upgrades
 
 Contenido:
 
-```
+```text
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Download-Upgradeable-Packages "1";
 APT::Periodic::AutocleanInterval "7";
 APT::Periodic::Unattended-Upgrade "1";
 ```
 
-Significado:
+Listas a diario, descarga, limpieza de la caché cada 7 días y aplicación diaria. `sudo dpkg-reconfigure -plow unattended-upgrades` crea el mismo archivo.
 
-- `Update-Package-Lists "1"` — `apt update` diario.
-- `Download-Upgradeable-Packages "1"` — descarga paquetes actualizables al caché.
-- `AutocleanInterval "7"` — cada 7 días limpia paquetes obsoletos del caché.
-- `Unattended-Upgrade "1"` — aplica las actualizaciones diariamente.
-
-Una alternativa equivalente es ejecutar `sudo dpkg-reconfigure -plow unattended-upgrades` y responder "Sí" al diálogo, que crea este mismo archivo.
-
-#### 14.6 Verificación de los timers
+#### 16.6 Verificación de los timers
 
 ```bash
 sudo systemctl status apt-daily.timer --no-pager
 sudo systemctl status apt-daily-upgrade.timer --no-pager
 ```
 
-Ambos deben aparecer como `active (waiting)` con próxima ejecución (`Trigger:`) listada.
-
-Listado de todos los timers activos para contexto:
+Ambos `active (waiting)` con su `Trigger:`.
 
 ```bash
 sudo systemctl list-timers --all
 ```
 
-#### 14.7 Simulación antes de la primera ejecución real
-
-Antes de esperar al primer ciclo automático, simular el comportamiento:
+#### 16.7 Simulación antes de la primera ejecución real
 
 ```bash
 sudo unattended-upgrades --dry-run --debug 2>&1 | less
 ```
 
-La salida muestra:
+Muestra qué se actualizaría, qué se omitiría y por qué, y si habría reinicio.
 
-- Qué paquetes serían actualizados.
-- Qué paquetes serían omitidos y por qué (origen no permitido, blacklist, etc.).
-- Si habría reinicio pendiente.
+> La simulación escribe también en `/var/log/unattended-upgrades/unattended-upgrades.log`, con líneas `DEBUG` y `The list of kept packages can't be calculated in dry-run mode`, que no son de una ejecución real. Los `INFO` sobre `powermgmt-base` y `python3-gi` salen siempre y no aplican a un servidor.
 
-Esta simulación es la mejor manera de detectar errores de configuración antes de que el flujo automático aplique cambios reales.
+#### 16.8 Revisión de logs tras la primera ejecución
 
-#### 14.8 Revisión de logs tras la primera ejecución
-
-Tras la primera ejecución automática (que ocurrirá en menos de 24 horas):
+Tras la siguiente activación de `apt-daily-upgrade.timer`:
 
 ```bash
 sudo less /var/log/unattended-upgrades/unattended-upgrades.log
 sudo less /var/log/unattended-upgrades/unattended-upgrades-dpkg.log
 ```
 
-El primero registra la lógica de decisión (qué se actualizó, qué se saltó). El segundo registra la salida cruda de `dpkg` durante las actualizaciones.
+El primero registra las decisiones; el segundo, la salida de `dpkg`.
 
-Si el correo a root está bien configurado, el reporte llega solo cuando hubo cambios o errores. La revisión manual del log es útil al principio para confirmar que el flujo funciona como se espera.
+#### 16.9 Qué hacer después de un point release
 
-#### 14.9 Qué hacer después de un point release
+**Opcional, recomendado.** Un point release consolida lo que ya venía por `trixie-security` y `trixie-updates`, así que casi todo está instalado cuando se anuncia. Quedan varias tareas que ningún automatismo hace.
 
-Un point release (13.5, 13.6, 13.7...) no cambia de versión mayor: consolida en el archivo principal los paquetes que ya venían llegando por `trixie-security` y `trixie-updates`. Con la configuración de §14.2, la mayor parte ya está instalada cuando se publica el anuncio. Aun así hay tres cosas que ningún automatismo hace y que dejan el servidor a medio actualizar si se omiten.
-
-**Completar la actualización.** Un point release puede traer paquetes nuevos, y en particular un cambio de ABI del kernel crea un paquete de imagen distinto en lugar de actualizar el existente. Después de un point release conviene ejecutar apt full-upgrade para asegurarse de que el sistema resuelve completamente los cambios de dependencias y mantiene actualizado el metapaquete del kernel. Debian documenta full-upgrade como el método para completar actualizaciones que requieren instalar o retirar paquetes.
+**Completar la actualización.** Un cambio de ABI del kernel crea un paquete nuevo en lugar de actualizar el existente, y solo `full-upgrade` lo instala:
 
 ```bash
 sudo apt update
@@ -3297,14 +3142,14 @@ sudo apt full-upgrade
 cat /etc/debian_version      # debe reflejar el point release nuevo
 ```
 
-Antes de correrlo, confirmar que hay espacio para otro kernel. Un `/boot` separado y ajustado se llena con tres imágenes y el `update-initramfs` falla a mitad de camino, que es la peor forma de descubrir el problema:
+Antes, espacio en `/boot`: uno pequeño se llena con tres kernels y `update-initramfs` falla a medias:
 
 ```bash
 df -h /boot
 dpkg -l 'linux-image*' | grep ^ii
 ```
 
-**Reiniciar, o al menos reiniciar los servicios.** Una actualización de `glibc`, `openssl` o `systemd` no surte efecto en los procesos que ya están corriendo con la versión anterior cargada en memoria:
+**Reiniciar, o al menos los servicios.** `glibc`, `openssl` o `systemd` nuevos no afectan a los procesos ya en marcha:
 
 ```bash
 ls /var/run/reboot-required 2>/dev/null && cat /var/run/reboot-required.pkgs
@@ -3314,51 +3159,53 @@ sudo needrestart                                  # resolver
 uname -r                                          # comparar con dpkg -l
 ```
 
-Si `uname -r` es más viejo que la imagen más nueva instalada, hay reinicio pendiente aunque nadie lo haya anunciado. Con reinicio pendiente, reiniciar y saltarse `needrestart`: el reinicio lo cubre todo.
+Si `uname -r` es anterior al kernel más nuevo, se reinicia y `needrestart` sobra.
 
-**Rehacer las líneas base de integridad, después del reinicio y no antes.** Esto es lo único que obliga a intervención manual siempre. Un point release suele recompilar paquetes contra la `glibc` nueva, y esas recompilaciones alcanzan binarios de base —`bash`, `busybox`, `gnupg2`, `docker.io`, e incluso `chkrootkit` y `tripwire`—. Cada binario recompilado cambia de hash, así que las bases de AIDE (§12.4) y rkhunter (§12.2) quedan desfasadas de golpe. Si no se rehacen, el reporte diario llega con miles de diferencias y deja de ser legible, que en la práctica equivale a apagar el control de detección:
+**Comprobar PAM.** Un `libpam-*` nuevo pasa por `pam-auth-update` y puede deshacer faillock (§9.3.3):
+
+```bash
+grep -E ' (libpam-[a-z0-9-]+|libpam-runtime):' /var/log/dpkg.log | grep ' upgrade \| install '
+diff <(grep -vE '^\s*#|^\s*$' /etc/pam.d/common-auth.faillock) \
+     <(grep -vE '^\s*#|^\s*$' /etc/pam.d/common-auth) && echo "✓ pila de faillock intacta"
+```
+
+Si hay diferencias, se corrige según la ATENCIÓN de §9.3.3 y se repiten sus pruebas.
+
+**Rehacer la base de AIDE, después del reinicio.** El point release recompila binarios contra la `glibc` nueva, cambian sus hashes y la base de §14.3 queda desfasada: sin rehacerla, el informe trae miles de diferencias y se deja de leer.
 
 ```bash
 sudo debsums -c                                       # 1. confirmar que nada quedó inconsistente
-sudo rkhunter --propupd                               # 2. nueva base de rkhunter
-sudo aide --init                                      # 3. nueva base de AIDE
-sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+sudo aideinit -y -f                                   # 2. nueva base de AIDE (§14.3)
 ```
 
-El orden importa. `debsums -c` primero, porque si reporta archivos alterados eso hay que entenderlo antes de sellar una base nueva sobre un sistema que podría estar comprometido; una base tomada después de un compromiso lo vuelve invisible. Y todo después del reinicio, porque una base tomada sobre un sistema a medio actualizar es peor que no tenerla.
-
-Al día siguiente, confirmar que el reporte volvió a estar limpio:
+`debsums -c` va primero, porque una base nueva sobre un sistema alterado sella el compromiso. Y todo después del reinicio, nunca con el sistema a medio actualizar. Al día siguiente:
 
 ```bash
 sudo aide --check | tail -20
 ```
 
-**Revisar qué cambió de configuración.** Los point releases también mueven `tzdata` y a veces corrigen el comportamiento de paquetes que este manual usa para diagnóstico. Vale la pena una lectura rápida del anuncio en <https://www.debian.org/News/> buscando los paquetes de este manual:  openssh`, `sudo`, `auditd`, `rsyslog`, `chrony`, `fail2ban`, `apparmor`, `msmtp`. Si alguno aparece con un cambio de comportamiento, la tabla de mensajes benignos de §2.5.2 puede necesitar una fila menos o una más.
+**Revisar el anuncio.** En <https://www.debian.org/News/>, buscar los paquetes del manual (`openssh`, `sudo`, `auditd`, `chrony`, `fail2ban`, `apparmor`, `msmtp`) por si cambió su comportamiento:
 
 ```bash
 timedatectl | grep -i "time zone"   # confirmar que tzdata no movió la zona
 sudo journalctl -p warning -b | tail -30
 ```
 
-**Si el servidor es una VM, parchear también el anfitrión.** Los point releases suelen incluir correcciones de `qemu` y `libvirt`, y una VM parcheada sobre un hipervisor sin parchear no gana nada frente a un escape de invitado. El anfitrión se actualiza con su propio ciclo, no con el de la VM.
+**En una VM, parchear también el anfitrión**, con su propio ciclo: los point releases suelen corregir `qemu` y `libvirt`.
 
-### 15. Sincronización de tiempo
+### 17. Sincronización de tiempo
 
-Un reloj desincronizado en un servidor causa problemas que parecen no tener relación con la hora: certificados que se rechazan, autenticaciones Kerberos que fallan, logs imposibles de correlacionar entre máquinas, replicación de bases de datos rota, fail2ban baneando IPs por eventos en el "futuro". La sincronización de tiempo no es opcional.
+Un reloj desviado rompe certificados, autenticaciones y la correlación de logs, y hace que fail2ban vea eventos "del futuro". Debian 13 trae `systemd-timesyncd`, un cliente SNTP suficiente. **Opcional, recomendado:** `chrony`, con NTP completo, mejor ajuste en redes inestables, NTS y métricas con `chronyc`.
 
-Debian 13 viene con `systemd-timesyncd` activo por defecto. Es un cliente NTP simple y suficiente para escritorios y servidores casuales. Para un servidor administrado seriamente, `chrony` es la opción recomendada: implementa NTP completo (no solo SNTP), maneja mejor los ajustes en redes inestables, soporta marcado de pasos cuando el reloj se desvía mucho, y expone métricas detalladas vía `chronyc`.
-
-#### 15.1 Migración de `systemd-timesyncd` a `chrony`
-
-Verificar el estado actual:
+#### 17.1 Migración de `systemd-timesyncd` a `chrony`
 
 ```bash
 timedatectl
 ```
 
-Salida típica con timesyncd activo:
+Salida típica con timesyncd:
 
-```
+```text
                Local time: ...
            Universal time: ...
                  RTC time: ...
@@ -3368,63 +3215,49 @@ System clock synchronized: yes
           RTC in local TZ: no
 ```
 
-Detener y deshabilitar `timesyncd`:
-
-```bash
-sudo systemctl disable --now systemd-timesyncd
-```
-
-Instalar `chrony`:
-
 ```bash
 sudo apt install -y chrony
 ```
 
-Es posible que `apt install...` muestre `dpkg-statoverride: warning: --update given but /var/log/chrony does not exist`. Es un warning cosmético: el paquete declara permisos para `/var/log/chrony/` pero no crea el directorio porque, por defecto, chrony envía sus logs a journald y no a archivos propios. El servicio funciona correctamente sin ese directorio. Para silenciar el warning de cara a futuras reinstalaciones, crearlo con los permisos correctos:
+`chrony` declara `Conflicts: time-daemon` y `apt` retira timesyncd en la misma operación (`REMOVING: systemd-timesyncd`), dejándolo en `rc`. Para borrarlo del todo:
 
 ```bash
-sudo install -d -o _chrony -g _chrony -m 0755 /var/log/chrony
+sudo apt purge -y systemd-timesyncd
 ```
 
-El paquete habilita y arranca el servicio automáticamente. Verificar:
+El aviso `dpkg-statoverride: ... --update given but /var/log/chrony does not exist` es normal: el directorio lo crea systemd al arrancar el servicio (`LogsDirectory=chrony`, modo 0750), con los mismos permisos que registra el paquete.
 
 ```bash
 sudo systemctl status chrony --no-pager
 ```
 
-Y confirmar el reemplazo:
-
 ```bash
 timedatectl
 ```
 
-Ahora `NTP service: active` se corresponde con chrony, no con timesyncd. `timedatectl` detecta automáticamente cuál cliente NTP gestiona la sincronización.
+`NTP service: active` corresponde ahora a chrony.
 
-#### 15.2 Configuración de servidores NTP
+#### 17.2 Configuración de servidores NTP
 
-El archivo principal es `/etc/chrony/chrony.conf`. Debian configura por defecto los pools de Debian (`pool.ntp.org` con sub-pools regionales). Para la mayoría de servidores esto es suficiente. Conviene revisar y ajustar.
-
-Inspeccionar la configuración por defecto:
+`/etc/chrony/chrony.conf` trae de serie el pool `2.debian.pool.ntp.org`:
 
 ```bash
 grep -E '^(pool|server)' /etc/chrony/chrony.conf
 ```
 
-Salida típica en Debian 13:
-
-```
+```text
 pool 2.debian.pool.ntp.org iburst
 ```
 
-Para un servidor ubicado en una región específica, conviene usar el pool por país (más preciso y con menor latencia que el pool continental) y el pool regional como respaldo. Por ejemplo, para servidores en Perú:
+El pool se elige por la ubicación física, no por la zona horaria: un VPS con `America/Lima` en un centro de datos europeo se sincroniza mejor con servidores europeos. Las fuentes que elige el pool por defecto (`chronyc sources`, 17.3) dan una pista de dónde está. Para un servidor en Perú, el pool del país y el regional de respaldo:
 
 ```bash
 sudoedit /etc/chrony/chrony.conf
 ```
 
-Reemplazar la línea `pool` por:
+La línea `pool` se sustituye por:
 
-```
+```text
 # Pool por país (menor latencia, más precisión; ajustar según el país del servidor)
 # Lista de pools por país: https://www.pool.ntp.org/zone/@
 pool 0.pe.pool.ntp.org iburst maxsources 3
@@ -3437,26 +3270,17 @@ pool 2.south-america.pool.ntp.org iburst maxsources 2
 pool 2.debian.pool.ntp.org iburst maxsources 1
 ```
 
-Significado:
+`iburst` acelera la primera sincronización y `maxsources` limita los servidores por pool. Otros países, en <https://www.pool.ntp.org/zone/@>, con el regional `north-america`, `europe`, `asia` u `oceania`.
 
-- `iburst` — al iniciar, envía 4-8 paquetes rápidos para sincronizar más rápido.
-- `maxsources N` — limita el número de servidores que el cliente toma del pool.
-
-Para servidores en otras regiones, sustituir el código de país según <https://www.pool.ntp.org/zone/@>, y el pool regional por el correspondiente: `north-america`, `europe`, `asia`, `oceania`.
-
-> Si el servidor está en una red corporativa con servidor NTP propio, usar ese servidor en lugar de los pools públicos:
+> Con servidor NTP corporativo:
 >
-> ```
+> ```text
 > server ntp.empresa.local iburst
 > ```
 
-**NTS (Network Time Security) — para entornos de alta exigencia:**
+**NTS (RFC 8915).** NTP de los pools viaja sin autenticar; NTS lo autentica sobre TLS y chrony lo soporta desde 4.0:
 
-La configuración estándar con pools públicos envía los paquetes NTP sin autenticación, lo que en principio permite ataques de manipulación del reloj en la red local. NTS (RFC 8915) añade autenticación criptográfica sobre TLS al protocolo NTP. chrony lo soporta desde la versión 4.0 (disponible en Debian 12+).
-
-Para activarlo, cambiar las directivas `pool`/`server` a directivas `pool`/`server` con la opción `nts`:
-
-```
+```text
 # Servidores con soporte NTS (verificar disponibilidad en el momento de la instalación)
 server time.cloudflare.com iburst nts
 server ntppool1.time.nl iburst nts
@@ -3465,23 +3289,23 @@ server ntppool1.time.nl iburst nts
 pool 2.debian.pool.ntp.org iburst maxsources 2
 ```
 
-> NTS requiere que el servidor tenga la hora ya aproximadamente correcta para negociar el TLS. Si el reloj inicia muy desviado, `makestep` (ya configurado por defecto en Debian) lo corregirá en las primeras iteraciones sin NTS antes de que NTS entre en acción. Verificar el estado con `chronyc authdata`.
-
-Reiniciar chrony tras los cambios:
+> NTS necesita la hora aproximadamente correcta para negociar TLS; `makestep` (17.4) la corrige antes. El estado, con `chronyc authdata`.
 
 ```bash
 sudo systemctl restart chrony
 ```
 
-#### 15.3 Verificación
+#### 17.3 Verificación
+
+Justo tras arrancar, `tracking` muestra `Skew : 1000000.000 ppm` y una `Root dispersion` de segundos: faltan muestras. Se espera unos minutos.
 
 ```bash
 chronyc tracking
 ```
 
-Salida típica de un servidor sincronizado correctamente:
+Salida típica:
 
-```
+```text
 Reference ID    : C0A80101 (ntp.example.com)
 Stratum         : 3
 Ref time (UTC)  : Mon Apr 27 09:00:00 2026
@@ -3497,73 +3321,46 @@ Update interval : 64.2 seconds
 Leap status     : Normal
 ```
 
-Indicadores de buen estado:
-
-- `Stratum` 2, 3 o 4. Stratum 0 es la fuente de tiempo (reloj atómico, GPS); cada salto añade 1. Un servidor doméstico típicamente queda en stratum 3.
-- `System time` con offset de microsegundos a milisegundos. Si está en segundos, hay problema.
-- `Leap status: Normal`. Otros valores (`Insert second`, `Delete second`) indican un leap second pendiente, lo que es normal cerca del 30 de junio o 31 de diciembre.
-
-Listar las fuentes que chrony está usando:
+`Stratum` 2 a 4, `System time` en micro o milisegundos y `Leap status: Normal`.
 
 ```bash
 chronyc sources -v
 ```
 
-La columna `MS` (Mode/State) indica el estado: `^*` es la fuente seleccionada como sincronización primaria, `^+` son fuentes válidas adicionales, `^-` son fuentes excluidas, `^?` son fuentes no contactadas todavía.
+En `MS`, `^*` es la fuente seleccionada, `^+` las que se combinan con ella, `^-` válidas fuera de la combinación (lo normal en la mayoría), `^x` y `^~` descartadas por incoherentes o variables, y `^?` inutilizables o sin respuesta todavía.
 
-#### 15.4 Comportamiento ante desviaciones grandes
+#### 17.4 Comportamiento ante desviaciones grandes
 
-Por defecto, chrony ajusta el reloj de forma gradual (slewing) para no causar saltos. Esto es lo correcto en la mayoría de los casos: un salto hacia atrás puede romper aplicaciones que asumen monotonicidad.
+chrony ajusta el reloj de forma gradual, porque un salto atrás rompe a las aplicaciones que asumen monotonía. Para el arranque tras un apagado largo o una VM suspendida, Debian trae:
 
-Sin embargo, si el reloj inicia con desviación muy grande (más de unos segundos, típico tras un apagado prolongado o en VMs que estuvieron suspendidas), el ajuste gradual puede tomar horas. Para permitir un paso (step) en arranque cuando la desviación es grande, la configuración por defecto en Debian incluye:
-
-```
-makestep 1.0 3
+```text
+makestep 1 3
 ```
 
-Significado: si en alguna de las primeras 3 mediciones la desviación supera 1 segundo, ajustar el reloj de un salto. Después de las primeras 3 mediciones, solo slewing.
+Si en alguna de las 3 primeras mediciones la desviación supera 1 segundo, salta; después, solo ajuste gradual. No se modifica.
 
-Esto es buen comportamiento para un servidor. No se modifica.
-
-#### 15.5 Verificación cruzada con `timedatectl`
+#### 17.5 Verificación cruzada con `timedatectl`
 
 ```bash
 timedatectl
 ```
 
-Confirmar:
+`System clock synchronized: yes`, `NTP service: active` y la zona de 7.3.
 
-- `System clock synchronized: yes`.
-- `NTP service: active`.
-- Zona horaria correcta (configurada en sección 5.3).
+### 18. Logs y rotación
 
-### 16. Logs y rotación
+Los logs son la primera fuente de diagnóstico y la única evidencia tras un incidente, y también pueden llenar `/var/log`. Debian 13 no instala `rsyslog`: no hay `/var/log/syslog` ni `auth.log`, y todo se consulta con `journalctl`. `logrotate` queda para los archivos planos de las aplicaciones. El reenvío a un servidor central depende de la infraestructura y tiene su propio manual (To-do).
 
-Los logs son la memoria operativa del servidor. Son la primera fuente de diagnóstico cuando algo falla, la única evidencia tras un incidente de seguridad, y la base de cualquier análisis de tendencia. Pero también son grandes consumidores de disco, y un descontrol en el manejo de logs puede dejar el servidor sin espacio en `/var/log` (con todas las consecuencias que eso conlleva).
+#### 18.1 Configuración de `journald`
 
-Esta sección configura tres frentes:
-
-- `journald` — el log estructurado de systemd. Maneja todo lo que registran los servicios systemd (la mayoría del sistema en Debian 13).
-- `rsyslog` o `logrotate` — para logs tradicionales en archivos planos (algunas aplicaciones, especialmente legacy, siguen escribiendo a `/var/log/*.log` directamente).
-- Reenvío opcional a un servidor central — solo se menciona, no se configura aquí.
-
-#### 16.1 Configuración de `journald`
-
-`journald` viene activo por defecto y guarda los logs en `/var/log/journal/` si ese directorio existe (persistente), o en `/run/log/journal/` si no existe (volátil, se pierde al reiniciar).
-
-Verificar el modo actual:
+journald guarda en `/var/log/journal/` si existe (persistente) y en `/run/log/journal/` si no (se pierde al reiniciar).
 
 ```bash
 sudo journalctl --disk-usage
 ls -ld /var/log/journal/ 2>/dev/null && echo "Logs persistentes" || echo "Logs volátiles"
 ```
 
-`--disk-usage` muestra el espacio total ocupado, sin distinguir ubicación. La verificación del directorio sí es concluyente:
-
-- Si `/var/log/journal/` existe, los logs son persistentes y journald los escribe ahí.
-- Si no existe, los logs están en `/run/log/journal/` (tmpfs) y se pierden al reiniciar.
-
-Para un servidor, los logs deben ser persistentes. Si no lo son:
+`--disk-usage` no distingue ubicación; lo concluyente es el directorio. Si no es persistente:
 
 ```bash
 sudo mkdir -p /var/log/journal
@@ -3571,21 +3368,19 @@ sudo systemd-tmpfiles --create --prefix /var/log/journal
 sudo systemctl restart systemd-journald
 ```
 
-Tras esto, journald empieza a escribir en disco. Los logs anteriores que estaban en `/run/log/journal/` se pierden, pero no es problema, es la primera configuración del servidor.
+##### 18.1.1 Límites de tamaño y retención
 
-##### 16.1.1 Límites de tamaño y retención
-
-Los valores por defecto de journald son razonables, pero conviene fijarlos explícitamente para que no dependan de defaults futuros y para que el comportamiento sea predecible.
-
-Editar `/etc/systemd/journald.conf`:
+Los valores van en un drop-in. `journald.conf` es un conffile de `systemd`: editado, `debsums -ac` (14.2) lo marca, y si una actualización trae una versión nueva, `unattended-upgrades` aparta el paquete (`Packages blacklist due to conffile prompts`) y systemd deja de actualizarse sin aviso.
 
 ```bash
-sudoedit /etc/systemd/journald.conf
+sudo install -d -m 0755 /etc/systemd/journald.conf.d
+printf '[Journal]\nStorage=persistent\nCompress=yes\nSystemMaxUse=1G\nSystemKeepFree=512M\nSystemMaxFileSize=128M\nMaxRetentionSec=3month\n' \
+  | sudo install -m 0644 /dev/stdin /etc/systemd/journald.conf.d/50-hardening.conf
 ```
 
-Descomentar y ajustar:
+Contenido resultante:
 
-```
+```ini
 [Journal]
 Storage=persistent
 Compress=yes
@@ -3593,28 +3388,42 @@ SystemMaxUse=1G
 SystemKeepFree=512M
 SystemMaxFileSize=128M
 MaxRetentionSec=3month
-ForwardToSyslog=no
 ```
 
-Significado:
+Los permisos explícitos evitan el efecto de `UMASK 027` (9.4), que dejaría el drop-in ilegible para `systemd-analyze cat-config`.
 
-- `Storage=persistent` — guardar en disco aunque `/var/log/journal/` no exista (lo crea si hace falta).
-- `Compress=yes` — comprimir logs viejos. Reduce el espacio en disco a costa de un poco de CPU.
-- `SystemMaxUse=1G` — el journal no usa más de 1 GB en total. Este valor es adecuado para el LV `/var/log` mínimo de 2 GiB recomendado en la sección 2.2, dejando margen para los logs de aplicaciones. Si el LV `/var/log` es de 5 GiB o más, se puede subir a `2G` o `3G`.
-- `SystemKeepFree=512M` — siempre dejar al menos 512 MB libres en el filesystem. Si el disco se llena, journald empieza a borrar logs viejos antes de seguir escribiendo.
-- `SystemMaxFileSize=128M` — cada archivo de journal individual no supera 128 MB. Cuando se llena, se rota a uno nuevo.
-- `MaxRetentionSec=3month` — borrar logs más viejos que 3 meses. Ajustar según los requerimientos de retención de la organización.
-- `ForwardToSyslog=no` — no duplicar logs a `/var/log/syslog` vía rsyslog. Reduce I/O y espacio. Si se necesita compatibilidad con herramientas que esperan `/var/log/syslog`, dejar `yes`.
-
-Aplicar:
+`Storage=persistent` crea el directorio si falta; `Compress=yes` comprime lo viejo; `SystemMaxUse=1G` acota el total, adecuado para un `/var/log` de 2 GiB (2.2) y ampliable a `2G` o `3G` con 5 GiB o más; `SystemKeepFree=512M` deja ese espacio libre; `SystemMaxFileSize=128M` rota cada archivo; `MaxRetentionSec=3month` borra lo anterior a tres meses, según la retención que exija la organización.
 
 ```bash
 sudo systemctl restart systemd-journald
+journalctl -u systemd-journald -n 1 -o cat
+systemd-analyze cat-config systemd/journald.conf | grep -v '^#' | grep .
 ```
 
-##### 16.1.2 Comandos básicos de consulta
+Salida de `journalctl` (el directorio es el machine-id y las cifras varían):
 
-Esta sección no es referencia exhaustiva de `journalctl` (la documentación es excelente: `man journalctl`), pero sí los patrones más comunes en operación:
+```text
+System Journal (/var/log/journal/<machine-id>) is 16M, max 1G, 1007.9M free.
+```
+
+Salida de `systemd-analyze cat-config`:
+
+```ini
+[Journal]
+[Journal]
+Storage=persistent
+Compress=yes
+SystemMaxUse=1G
+SystemKeepFree=512M
+SystemMaxFileSize=128M
+MaxRetentionSec=3month
+[Journal]
+ForwardToSyslog=yes
+```
+
+`max 1G` confirma el drop-in. El primer `[Journal]` vacío es `journald.conf` sin cambios, y el último bloque es el `syslog.conf` de Debian en `/usr/lib/systemd/journald.conf.d/`, que fija `ForwardToSyslog=yes` y gana a `journald.conf`. Sin `rsyslog` no hay quien reciba el reenvío; si se instala y se quiere evitar la duplicación, el valor se fija en un drop-in que se ordene después de `syslog.conf`.
+
+##### 18.1.2 Comandos básicos de consulta
 
 ```bash
 # Arranques registrados (requisito para usar -b -N)
@@ -3644,41 +3453,36 @@ sudo journalctl -b -p err
 sudo journalctl --verify
 ```
 
-Algunas precisiones que evitan interpretaciones erróneas:
+- `-e` salta al final del paginador; en `-f` no hay paginador y se sale con Ctrl+C.
+- `-b -1` necesita un arranque anterior registrado; si no lo hay, da `No journal boot entry found for the specified boot (-1)`. `--list-boots` lo dice antes.
+- Una fecha sin hora es las 00:00: `--until "2026-09-26"` excluye ese día; para incluirlo, `--until "2026-09-26 23:59:59"`.
+- Los meses siguen el locale (7.4): con `es_PE.UTF-8`, septiembre es `set`. Para scripts, `-o short-iso`.
+- En un servidor recién desplegado, `-b -p err` solo debe mostrar entradas conocidas: el error de `systemd-ssh-generator` (2.5.2) hasta el siguiente arranque, y los fallos de autenticación de las pruebas de faillock (9.3.3) o de una conexión con demasiadas llaves (10.4) (`3 incorrect password attempts`, `a password is required`, `maximum authentication attempts exceeded`). Cualquier otra merece atención.
+- Durante un recorrido intensivo del disco, como el de AIDE (14.3), puede salir `auditd: Error receiving audit netlink packet (No buffer space available)`. Se observó con `lost 0` después, pero qué implica está pendiente de validación. Si se repite fuera de esos momentos, se revisa `-b 8192` (14.1).
+- Con el usuario en `adm` (9.2), `journalctl` lee todo sin `sudo`. Los ejemplos usan `sudo` para no depender de eso; la excepción de 9.3.1 evita que se dupliquen en `/var/log/sudo-io/`.
 
-- `-e` salta al final del paginador. En operación casi siempre interesa lo último que ocurrió, no el mapa de memoria del firmware con el que empieza cada arranque. En `-f` no hay paginador: la tecla `q` no hace nada y se sale con Ctrl+C.
-- `-b -1` necesita que exista un arranque anterior registrado. En un servidor que no ha reiniciado desde que el journal es persistente, devuelve `No journal boot entry found for the specified boot (-1)`, y es lo esperado. Por eso conviene consultar antes `--list-boots`.
-- Las expresiones relativas (`today`, `yesterday`, `"1 hour ago"`) funcionan en cualquier servidor y en cualquier momento. Con fechas absolutas hay que tener en cuenta que una fecha sin hora equivale a las 00:00: `--until "2026-09-26"` excluye todo lo ocurrido ese día. Si hace falta un día completo, indicar la hora (`--until "2026-09-26 23:59:59"`).
-- Los nombres de mes siguen el locale configurado en la sección 5.4. Con `es_PE.UTF-8`, septiembre aparece como `set` (de "setiembre"). Para scripts que procesen la salida, usar `-o short-iso`, que no depende del idioma.
-- En un servidor recién desplegado, `-b -p err` debería estar vacío una vez enmascarado el generador de la sección 2.5.2. Cualquier entrada que aparezca merece atención.
-- Si el usuario administrativo pertenece al grupo `adm` (7.2), `journalctl` lee el journal completo sin `sudo`; si no, solo ve sus propias entradas. Los ejemplos usan `sudo` para que el resultado no dependa de eso. La excepción de `log_output` de la sección 7.3.1 evita que cada consulta con `sudo` se duplique en `/var/log/sudo-io/`.
+> **Nota:** `--verify` comprueba la estructura de los archivos, no que nadie los haya alterado. Para eso existe Forward Secure Sealing: `journalctl --setup-keys` genera una clave de sellado, que queda en el servidor, y una de verificación, que se guarda fuera, y `journalctl --verify --verify-key=<clave>` comprueba los sellos. `Seal=yes` es el valor por defecto, pero sin claves no hace nada. No se configura en el manual base (To-do).
 
-> **Nota:** `--verify` comprueba que los archivos del journal son estructuralmente consistentes, no que nadie los haya alterado. Un `PASS` no es evidencia de integridad frente a un atacante con root. Para eso existe Forward Secure Sealing (FSS): `journalctl --setup-keys` genera una clave de sellado que queda en el servidor y una clave de verificación que se guarda fuera de él, y `journalctl --verify --verify-key=<clave>` comprueba los sellos. `Seal=yes` es el valor por defecto de `journald.conf`, pero solo tiene efecto si existen las claves. FSS no se configura en este manual base; es una opción a evaluar en servidores con requisitos de auditoría.
+La persistencia se demuestra cuando un arranque sobrevive al siguiente. Tras un reinicio controlado, `--list-boots` debe mostrar dos entradas y `sudo journalctl -b -1 -e` terminar con un apagado limpio:
 
-La persistencia del journal solo queda demostrada cuando un arranque sobrevive al siguiente. Para cerrar esta sección conviene un reinicio controlado; después, `--list-boots` debe mostrar al menos dos entradas, y `sudo journalctl -b -1 -e` debe terminar con un apagado limpio:
-
-```
+```text
 systemd-journald[...]: Received SIGTERM from PID 1 (systemd-shutdow).
 systemd-journald[...]: Journal stopped
 ```
 
-El mismo reinicio sirve para confirmar que el resto de la configuración aplicada hasta aquí (puerto SSH, UFW, chrony) también sobrevive, con el mismo criterio de la sección 5.5.8.
+El mismo reinicio confirma que SSH, UFW y chrony sobreviven (7.5.8).
 
-#### 16.2 `logrotate` para logs de aplicaciones
+#### 18.2 `logrotate` para logs de aplicaciones
 
-Algunas aplicaciones (especialmente las que se ejecutan fuera de systemd o que escriben logs propios además del journal) usan archivos planos en `/var/log/`. Para ellas, `logrotate` es la herramienta estándar. Viene preinstalado en Debian.
-
-Verificar configuración global:
+Para las aplicaciones que escriben archivos propios en `/var/log/`. Viene instalado.
 
 ```bash
 cat /etc/logrotate.conf
 ```
 
-Las configuraciones específicas de cada aplicación están en `/etc/logrotate.d/`. Cada paquete que instale logs propios suele dejar ahí su archivo.
+Cada paquete deja su archivo en `/etc/logrotate.d/`. Para una aplicación nueva (`/etc/logrotate.d/miapp`):
 
-Plantilla recomendada para una aplicación nueva (ejemplo, `/etc/logrotate.d/miapp`):
-
-```
+```text
 /var/log/miapp/*.log {
     weekly
     rotate 8
@@ -3694,61 +3498,36 @@ Plantilla recomendada para una aplicación nueva (ejemplo, `/etc/logrotate.d/mia
 }
 ```
 
-Significado:
-
-- `weekly` — rotar semanalmente.
-- `rotate 8` — guardar 8 archivos rotados (8 semanas de historia).
-- `compress` — comprimir los archivos rotados (gzip por defecto).
-- `delaycompress` — no comprimir el archivo más reciente (el de la semana pasada). Útil porque algunas aplicaciones siguen escribiendo en él durante un tiempo.
-- `missingok` — no fallar si el archivo no existe (típico al instalar la app por primera vez).
-- `notifempty` — no rotar archivos vacíos.
-- `create 0640 miapp adm` — al rotar, crear un archivo nuevo con esos permisos y propietarios.
-- `sharedscripts` — ejecutar los scripts pre/postrotate una sola vez aunque haya múltiples archivos.
-- `postrotate` — recargar el servicio para que reabra los handles de log.
-
-Para probar la configuración sin esperar a la próxima rotación:
+Rotación semanal con 8 archivos, comprimidos salvo el más reciente (`delaycompress`, por si la aplicación aún escribe en él), sin fallar si falta (`missingok`) ni rotar vacíos (`notifempty`), con el archivo nuevo creado con esos permisos y una recarga del servicio tras rotar (`sharedscripts` la hace una sola vez).
 
 ```bash
 sudo logrotate -d /etc/logrotate.d/miapp     # debug, no aplica nada
 sudo logrotate -f /etc/logrotate.d/miapp     # fuerza la rotación ahora
 ```
 
-`logrotate` se ejecuta diariamente vía systemd (`logrotate.timer`). Verificar:
+Lo ejecuta `logrotate.timer` a diario:
 
 ```bash
 sudo systemctl status logrotate.timer --no-pager
 ```
 
-##### 16.2.1 Sesiones de `sudo` en `/var/log/sudo-io/`
+##### 18.2.1 Sesiones de `sudo` en `/var/log/sudo-io/`
 
-La directiva `log_output` de la sección 7.3.1 graba en `/var/log/sudo-io/` la salida de cada orden ejecutada con sudo. Ese directorio no lo gestiona `logrotate` ni tiene rotación propia: crece de forma continua y sin límite. La excepción de `journalctl` en 7.3.1 elimina la fuente de crecimiento más grande, pero el resto de sesiones sigue acumulándose.
-
-La retención se fija con una regla de `systemd-tmpfiles`:
+Lo que graba `log_output` (9.3.1) no lo rota nadie y crece sin límite. La retención se fija con `systemd-tmpfiles`:
 
 ```bash
-echo 'e /var/log/sudo-io - - - 90d' | sudo tee /etc/tmpfiles.d/sudo-io.conf > /dev/null
+echo 'e /var/log/sudo-io - - - 90d' | sudo install -m 0644 /dev/stdin /etc/tmpfiles.d/sudo-io.conf
 sudo systemd-tmpfiles --clean /etc/tmpfiles.d/sudo-io.conf
 sudo systemctl status systemd-tmpfiles-clean.timer --no-pager
 ```
 
-El tipo `e` con `-` en modo, usuario y grupo no cambia permisos ni propietarios: solo borra por antigüedad el contenido del directorio. `systemd-tmpfiles-clean.timer` aplica la regla a diario, y que `--clean` no devuelva nada es lo normal. Los 90 días están alineados con `MaxRetentionSec=3month` del journal (16.1.1). Estas sesiones son evidencia de auditoría, así que si la organización exige más retención, ajustar ambos valores a la vez, con el criterio de la sección 16.5.
-
-El contador de sesiones de sudo no se reinicia al borrar las antiguas, así que `sudoreplay` sigue funcionando con las que quedan:
+El tipo `e` con `-` en modo, usuario y grupo solo borra por antigüedad; lo aplica `systemd-tmpfiles-clean.timer` a diario, y que `--clean` no devuelva nada es lo normal. Los 90 días coinciden con `MaxRetentionSec=3month` (18.1.1); si se exige más, se cambian ambos (18.4). `sudoreplay` sigue funcionando con las sesiones que quedan:
 
 ```bash
 sudo sudoreplay -l | tail -5     # últimas sesiones grabadas
 ```
 
-#### 16.3 Reenvío a un servidor central (opcional)
-
-Para infraestructuras con múltiples servidores, conviene enviar los logs a un servidor central de log management. Las dos opciones más comunes son:
-
-- `rsyslog` con reenvío UDP/TCP a un servidor remoto. Tradicional, ampliamente compatible.
-- `journald` con `systemd-journal-upload` y `systemd-journal-remote`. Más moderno, integrado con systemd.
-
-Esta configuración no se cubre en el manual base porque depende de la infraestructura disponible (servidor central, formato esperado, autenticación). Se documentará en un manual de infraestructura específico. Lo único que conviene dejar registrado en este manual base: cuando llegue el momento de reenviar logs, recordar abrir el puerto correspondiente en el firewall (UFW) y configurar autenticación TLS para que el tráfico no vaya en claro.
-
-#### 16.4 Verificación de uso de disco
+#### 18.3 Verificación de uso de disco
 
 ```bash
 df -hT /var/log
@@ -3756,63 +3535,39 @@ sudo du -sh /var/log/* | sort -h
 sudo journalctl --disk-usage
 ```
 
-El primer comando muestra el espacio del filesystem `/var/log`. El segundo muestra qué directorios consumen más espacio; entre ellos conviene vigilar `/var/log/sudo-io`, que no depende ni de journald ni de logrotate. El tercero muestra cuánto usa el journal específicamente.
+Espacio de `/var/log`, directorios más grandes (vigilando `/var/log/sudo-io`) y uso del journal. Si se llena: bajar `SystemMaxUse` y `MaxRetentionSec`, rotar menos archivos, acortar `/var/log/sudo-io/` o excluir de `log_output` otros comandos voluminosos (9.3.1), o ampliar el LV con `lvresize` (2.2).
 
-Si `/var/log` está cerca de llenarse, las opciones son:
+#### 18.4 Retención frente a necesidad forense
 
-- Reducir `SystemMaxUse` y `MaxRetentionSec` en journald.
-- Reducir el número de archivos rotados en logrotate.
-- Acortar la retención de `/var/log/sudo-io/` (16.2.1) o excluir de `log_output` otros comandos de salida voluminosa, con el mismo patrón que `journalctl` en 7.3.1.
-- Ampliar el LV `/var/log` con `lvresize` (si se configuró LVM en la sección 2.2).
-
-#### 16.5 Retención frente a necesidad forense
-
-La configuración de rotación de las subsecciones anteriores está calibrada para dos objetivos que no son el mismo: que el disco no se llene, y que haya contexto suficiente para diagnosticar un problema en curso. Ninguno de los dos garantiza que los registros sigan ahí cuando haga falta reconstruir algo que ocurrió hace una semana.
-
-El caso típico es un incidente de seguridad. Se detecta tarde, porque casi siempre se detecta tarde, y al ir a buscar qué pasó resulta que los registros de esos días ya rotaron. El servicio funcionaba, el disco estaba sano, la rotación hizo exactamente lo que se le pidió, y aun así la evidencia no está.
-
-Conviene por eso revisar la retención efectiva de cada fuente en lugar de confiar en la intención de la configuración. La aritmética es simple: volumen diario por número de archivos conservados, dividido por el tamaño de rotación.
+La rotación está calibrada para que el disco no se llene y para diagnosticar lo que pasa hoy, no para reconstruir lo que pasó hace una semana. Un incidente se detecta tarde, y los registros de esos días pueden haber rotado aunque todo funcionara como se configuró. Se revisa la retención efectiva de cada fuente:
 
 ```bash
 # journald: uso actual y límite configurado
 journalctl --disk-usage
-grep -E '^\s*(SystemMaxUse|MaxRetentionSec)' /etc/systemd/journald.conf*
+grep -rE '^\s*(SystemMaxUse|MaxRetentionSec)' /etc/systemd/journald.conf /etc/systemd/journald.conf.d/
 
 # logs de aplicación: cuántos archivos hay y qué periodo cubren
-ls -lh --time-style=+%F /var/log/<servicio>/
+SERVICIO=miapp   # directorio de logs de la aplicación
+ls -lh --time-style=+%F "/var/log/${SERVICIO:?}/"
 ```
 
-Compara la fecha del archivo más antiguo con la retención que pretendías. Si la rotación es por tamaño y el volumen creció, la retención real puede ser una fracción de la esperada sin que nada lo avise.
+La fecha del archivo más antiguo debe coincidir con la retención pretendida. Con rotación por tamaño y número fijo de archivos, la retención depende del tráfico: cuanto más ocupado el servicio, menos historia, justo al revés de lo deseable, y los sondeos de salud consumen esa cuota sin aportar. Lo razonable es separar los dos usos: rotación normal para la operación y una copia comprimida de los logs de acceso al destino de respaldos (sección 20), con retención de meses.
 
-Dos observaciones que se repiten. Las rotaciones por tamaño (`roll_size`, `max-size`) combinadas con un número fijo de archivos dan una retención que varía con el tráfico, no con el tiempo: cuanto más ocupado el servicio, menos historia conserva, que es justo lo contrario de lo deseable. Y los servicios que registran cada petición, incluidos los sondeos de salud automáticos, generan un volumen de fondo constante que consume esa cuota sin aportar nada.
+> Los contenedores tienen su propia rotación, pensada para no llenar el disco y no para conservar historia. Se revisa con el mismo criterio.
 
-La respuesta razonable no es conservar todo indefinidamente sino separar los dos usos: rotación normal para la operación diaria, y una copia comprimida de los logs de acceso hacia el destino de respaldos de la sección 18, donde la retención se mide en meses y no en megabytes.
+### 19. Monitoreo básico
 
-> Si el servidor corre contenedores, su demonio tiene su propia rotación, independiente de `journald` y de `logrotate`. Conviene revisarla con el mismo criterio, porque sus valores por defecto están pensados para no llenar el disco y no para conservar historia.
+Un par de comprobaciones periódicas que envían correo cuando algo falla cubren la mayoría de los problemas operativos. Prometheus, Zabbix o Netdata son de manuales específicos.
 
-### 17. Monitoreo básico
+#### 19.1 Herramientas de consulta puntual
 
-Un servidor sin monitoreo puede caer y nadie se entera hasta que un usuario reporta el incidente. El monitoreo no tiene que ser sofisticado para ser útil: un par de chequeos básicos ejecutados periódicamente y enviando correo cuando algo va mal cubre el 80% de los problemas operativos.
-
-Esta sección cubre lo mínimo razonable: herramientas de consulta puntual, alertas básicas con scripts y cron/timers, y verificación del estado de servicios críticos. Soluciones completas (Prometheus + Grafana, Zabbix, Netdata) pertenecen a manuales específicos.
-
-#### 17.1 Herramientas de consulta puntual
-
-Conjunto mínimo que conviene tener instalado en cualquier servidor para diagnóstico ad-hoc:
+**Opcional, recomendado.**
 
 ```bash
-sudo apt install -y htop iotop iftop sysstat lsof wtmpdb libpam-wtmpdb
+sudo apt install -y htop iotop iftop sysstat lsof
 ```
 
-Resumen de uso:
-
-- `htop` — vista interactiva de procesos, CPU, memoria. Reemplazo moderno de `top`.
-- `iotop` — qué procesos están haciendo I/O. Crítico cuando el sistema está lento sin razón aparente y `htop` no muestra carga de CPU.
-- `iftop` — qué conexiones consumen más ancho de banda.
-- `sysstat` — incluye `sar`, `iostat`, `mpstat`, `pidstat`. Para análisis histórico de rendimiento.
-- `lsof` — qué procesos tienen abiertos qué archivos/sockets. Útil para encontrar qué está bloqueando un puerto, qué está reteniendo un filesystem para desmontar, etc.
-
-Comandos rápidos de referencia:
+`htop` para procesos, CPU y memoria; `iotop`, qué procesos hacen E/S cuando el sistema va lento sin carga de CPU; `iftop`, qué conexiones consumen ancho de banda; `sysstat`, con `sar`, `iostat`, `mpstat` y `pidstat` para el histórico; `lsof`, qué proceso retiene un archivo o un puerto.
 
 ```bash
 # Top 10 procesos por uso de memoria
@@ -3844,52 +3599,55 @@ w
 free -h
 ```
 
-`sysstat` requiere un paso adicional para habilitar la recolección histórica:
+La recogida histórica de `sysstat` se activa así:
 
 ```bash
 sudo sed -i 's/^ENABLED="false"/ENABLED="true"/' /etc/default/sysstat
-sudo systemctl restart sysstat
+sudo dpkg-reconfigure -f noninteractive sysstat
+systemctl list-timers 'sysstat*' --no-pager
 ```
 
-A partir de ahí, `sar` muestra estadísticas históricas (CPU, memoria, disco, red) hasta varios días atrás.
+Con systemd recoge `sysstat-collect.timer`; el `/etc/cron.d/sysstat` llama a `debian-sa1`, que no hace nada con systemd. `ENABLED` solo lo lee la configuración del paquete, que habilita o deshabilita los timers, así que tras cambiarlo hace falta `dpkg-reconfigure`; reiniciar `sysstat.service` no toca los timers. Los dos comandos se pueden repetir.
 
-#### 17.2 Alertas mínimas vía cron
+`list-timers` debe mostrar `sysstat-collect.timer` y `sysstat-summary.timer`; sin ellos, `sar` no tendrá datos:
 
-Para alertas básicas sin instalar herramientas complejas, un script en `/etc/cron.hourly/` que verifica condiciones críticas y envía correo si algo está mal es suficiente.
+```text
+NEXT                        LEFT LAST PASSED UNIT                  ACTIVATES
+Sat 2026-10-17 19:10:00 -05 9min -         - sysstat-collect.timer sysstat-collect.service
+Sun 2026-10-18 00:07:00 -05 5h   -         - sysstat-summary.timer sysstat-summary.service
+```
+
+#### 19.2 Alertas mínimas vía cron
+
+**Opcional, recomendado.** Un script en `/etc/cron.hourly/` que comprueba condiciones críticas y avisa por correo:
 
 ```bash
-# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §A.1.1)
+# Descargar e instalar la plantilla (requiere SHA_COMMIT y ASSETS_BASE definidos según §3.1.1)
 : "${ASSETS_BASE:?}" && \
 wget "${ASSETS_BASE}/plantilla-etc-cron.hourly-server-check.txt" \
     -O /tmp/plantilla-etc-cron.hourly-server-check.txt && \
-sudo mkdir -p /etc/cron.hourly/ && \
-sudo cp /tmp/plantilla-etc-cron.hourly-server-check.txt /etc/cron.hourly/server-check
+sudo install -D -m 0700 -o root -g root \
+    /tmp/plantilla-etc-cron.hourly-server-check.txt /etc/cron.hourly/server-check
 ```
 
-Permisos:
+`install` fija propietario y permisos en un paso repetible, y `-D` crea el directorio si falta. El destino no lleva punto ni extensión, porque `run-parts` ignora esos nombres.
 
 ```bash
-sudo chmod +x /etc/cron.hourly/server-check
-sudo chmod 700 /etc/cron.hourly/server-check
-sudo chown root:root /etc/cron.hourly/server-check
+sudo run-parts --test /etc/cron.hourly
+bash -n /tmp/plantilla-etc-cron.hourly-server-check.txt && echo "sintaxis correcta"
+sed 's#| /usr/sbin/sendmail -t#| cat#' /tmp/plantilla-etc-cron.hourly-server-check.txt | bash
 ```
 
-Adaptar la lista de servicios críticos según el rol del servidor. En un servidor de mail, añadir `postfix` y `dovecot`. En un web server, `nginx` o `apache2`.
+El primer comando debe listar `server-check`, y solo con `sudo`, porque el script es 0700. El tercero es una prueba en seco que cambia el envío por la pantalla; en un servidor sano no imprime nada. Los servicios críticos se adaptan al rol (`postfix` y `dovecot`, `nginx` o `apache2`). El correo a root llega fuera con la sección 21.
 
-Para que el correo a root llegue a una dirección externa, el servidor necesita un MTA local configurado para reenvío. La opción más simple es `msmtp` o `bsd-mailx` con un relay SMTP autenticado. La configuración de ese reenvío está en la sección 19. Un servidor de correo completo, que además recibe, pertenece a su propio manual.
-
-#### 17.3 Estado de servicios críticos
-
-Comando único para una visión general:
+#### 19.3 Estado de servicios críticos
 
 ```bash
 systemctl --failed
 systemctl list-units --state=running --type=service | head -30
 ```
 
-`systemctl --failed` debe estar vacío en condiciones normales. Cualquier servicio que aparezca ahí merece investigación inmediata.
-
-Verificación específica de servicios introducidos en el manual hasta ahora:
+`systemctl --failed` debe estar vacío. Los servicios del manual:
 
 ```bash
 for svc in ssh chrony fail2ban ufw apparmor unattended-upgrades; do
@@ -3897,99 +3655,69 @@ for svc in ssh chrony fail2ban ufw apparmor unattended-upgrades; do
 done
 ```
 
-### 18. Respaldos
+### 20. Respaldos
 
-Sin respaldos, un servidor es un punto único de falla. Y un respaldo que nunca se restauró es una hipótesis, no un respaldo. Esta sección establece una estrategia mínima razonable para un servidor base: qué respaldar, dónde guardarlo, cómo automatizarlo, y cómo probar la restauración.
+Sin respaldos, el servidor es un punto único de fallo, y un respaldo nunca restaurado es una hipótesis. Esta sección es el mínimo para un servidor base; los datos pesados (bases de datos, buzones) tienen estrategias propias en sus manuales.
 
-El alcance es generalista. Servidores con datos pesados (bases de datos en producción, mail con miles de buzones, sistemas de archivos compartidos) requieren estrategias específicas que se documentan en sus manuales correspondientes.
+> Pendiente de validación: esta sección no se ha ejecutado completa con la versión 0.10 del manual (To-do).
 
-#### 18.1 Estrategia 3-2-1
+#### 20.1 Estrategia 3-2-1
 
-La regla 3-2-1 sigue siendo el estándar mínimo razonable:
+Tres copias (el original y dos respaldos), en dos medios distintos y una fuera del sitio: el sistema del servidor, un repositorio local en `/var/backups/borg-local/` o un disco secundario, y un repositorio remoto (servidor de respaldos, Backblaze B2, S3, Hetzner Storage Box o un NAS en otra ubicación).
 
-- 3 copias de los datos: el original más dos respaldos.
-- 2 medios distintos: por ejemplo, disco local y almacenamiento remoto.
-- 1 copia fuera del sitio físico: protege contra incendio, robo, o fallo de la infraestructura completa.
+#### 20.2 Qué respaldar
 
-Aplicado al servidor base:
+`/etc`, `/root`, `/home`, `/var/spool/cron`, la lista de paquetes y, de forma opcional, `/var/log`, útil para el análisis forense. Los datos del rol los añade su manual. No se respalda lo que reinstalan los paquetes (`/usr`, `/bin`, `/sbin`, `/lib`), lo transitorio (`/var/cache`, `/var/tmp`, `/tmp`) ni las bases de datos en bruto, que se vuelcan con su herramienta (`pg_dump`, `mariabackup`, `mongodump`) y se respalda el volcado.
 
-- Original: el propio sistema de archivos del servidor.
-- Copia local: respaldos en `/var/backups/borg-local/` o un disco secundario montado.
-- Copia remota: repositorio Borg en un servidor de respaldos, almacenamiento en la nube (Backblaze B2, S3, Hetzner Storage Box) o un NAS en otra ubicación.
-
-#### 18.2 Qué respaldar
-
-Para un servidor base, el conjunto mínimo es:
-
-- `/etc` — toda la configuración del sistema y de los servicios.
-- `/root` — el home de root (scripts administrativos, notas).
-- `/home` — homes de usuarios administrativos.
-- `/var/log` (opcional) — útil para análisis forense, no para restaurar.
-- `/var/spool/cron` — tareas cron del sistema.
-- Lista de paquetes instalados — para reconstruir el sistema desde cero.
-- Datos específicos del rol — bases de datos, buzones de correo, sitios web. Se añaden en los manuales de rol.
-
-Lo que típicamente no se respalda en el servidor base:
-
-- `/usr`, `/bin`, `/sbin`, `/lib` — vienen de los paquetes; reinstalando los paquetes se recuperan.
-- `/var/cache`, `/var/tmp`, `/tmp` — datos transitorios.
-- Bases de datos directamente desde el filesystem — se respaldan con su propia herramienta (`pg_dump`, `mariabackup`, `mongodump`) y luego ese dump se incluye en el respaldo.
-
-##### 18.2.1 Lista de paquetes instalados
+##### 20.2.1 Lista de paquetes instalados
 
 ```bash
 sudo apt-mark showmanual | sudo tee /root/paquetes-manual.txt > /dev/null
 sudo dpkg --get-selections | sudo tee /root/paquetes-completo.txt > /dev/null
 ```
 
-Estos archivos quedan en `/root/`, así que entran en el respaldo automáticamente. Para restaurar:
+Quedan en `/root/` y entran en el respaldo. Para restaurar:
 
 ```bash
-sudo dpkg --set-selections < paquetes-completo.txt
+sudo cat /root/paquetes-completo.txt | sudo dpkg --set-selections
 sudo apt-get dselect-upgrade
 ```
 
-#### 18.3 BorgBackup
+La lista se lee con `sudo cat` y no con una redirección (`<`), porque la redirección la abre la shell del usuario, que no puede leer `/root/`.
 
-`borgbackup` (binario `borg`) es la herramienta recomendada para servidores Linux modernos. Combina deduplicación a nivel de bloque (los respaldos sucesivos solo guardan lo que cambió), compresión, cifrado de extremo a extremo, y verificación de integridad. Los repositorios pueden estar en disco local, NFS, SSH remoto, o servicios compatibles (BorgBase, rsync.net).
+#### 20.3 BorgBackup
 
-##### 18.3.1 Instalación
+`borg` deduplica por bloques, comprime, cifra de extremo a extremo y verifica integridad, sobre disco local, SSH o servicios compatibles (BorgBase, rsync.net).
+
+##### 20.3.1 Instalación
 
 ```bash
 sudo apt install -y borgbackup
 ```
 
-##### 18.3.2 Inicialización del repositorio local
+##### 20.3.2 Inicialización del repositorio local
 
 ```bash
 sudo mkdir -p /var/backups/borg-local
 sudo borg init --encryption=repokey-blake2 /var/backups/borg-local
 ```
 
-`repokey-blake2` cifra el repositorio con una clave que se guarda dentro del propio repositorio, protegida por una passphrase. Es la opción más simple para un solo administrador. Para escenarios multi-administrador o donde la passphrase no debe estar accesible desde el cliente, existen alternativas (`keyfile-blake2`).
+`repokey-blake2` guarda la clave dentro del repositorio, protegida por la passphrase; `keyfile-blake2` la deja fuera, para varios administradores o cuando la passphrase no debe estar en el cliente.
 
-> Importante: borg pide passphrase durante el `init`. Esta passphrase es la única forma de descifrar el repositorio. Guardarla en un gestor de contraseñas independiente del servidor. Si se pierde, los respaldos son irrecuperables.
+> **Importante:** la passphrase es la única forma de descifrar el repositorio. Va al gestor de contraseñas, fuera del servidor; si se pierde, los respaldos son irrecuperables.
 
-##### 18.3.3 Inicialización del repositorio remoto
-
-Para el respaldo fuera del sitio, asumiendo un servidor de respaldos accesible por SSH:
+##### 20.3.3 Inicialización del repositorio remoto
 
 ```bash
 sudo borg init --encryption=repokey-blake2 \
     backup@servidor-backup.example.com:/srv/borg/$(hostname)
 ```
 
-Requisitos previos:
+Requiere la llave SSH de root del servidor copiada a una cuenta `backup` del servidor de respaldos, con `borg` instalado y escritura sobre `/srv/borg/`. En el `authorized_keys` de ese lado, `command="borg serve --restrict-to-path /srv/borg/<hostname>"` limita la llave a `borg serve`, de modo que robada no sirve para una sesión interactiva.
 
-- Llave SSH del usuario `root` del servidor de respaldos copiada al servidor backup.
-- Cuenta `backup` en el servidor backup con `borg` instalado y permisos de escritura sobre `/srv/borg/`.
-- Conexión SSH funcional desde el servidor cliente al servidor backup en el puerto correspondiente.
+##### 20.3.4 Script de respaldo
 
-Para reducir la superficie de ataque, conviene restringir la llave SSH a ejecutar solo `borg serve` en el servidor backup, mediante `command="borg serve --restrict-to-path /srv/borg/<hostname>"` en el `authorized_keys` del lado servidor. Esto evita que una llave robada pueda usarse para sesión interactiva u otros comandos.
-
-##### 18.3.4 Script de respaldo
-
-Crear `/usr/local/sbin/borg-backup.sh`:
+Se crea `/usr/local/sbin/borg-backup.sh`:
 
 ```bash
 sudoedit /usr/local/sbin/borg-backup.sh
@@ -4059,27 +3787,19 @@ sudo bash -c 'read -rsp "Passphrase para Borg (no se mostrará): " PHRASE && pri
 sudo chmod 600 /root/.borg-passphrase
 ```
 
-> **`/var/log/journal/*` excluido:** el journal de systemd ya tiene su propia retención configurada en la sección 16.1.1 y puede ser de cientos de MB. Incluirlo en el respaldo diario lo haría crecer rápidamente sin valor proporcional de recuperación (el journal es diagnóstico, no datos de negocio). Los demás subdirectorios de `/var/log` (logs de aplicaciones rotados) sí se incluyen porque pueden tener valor forense o de auditoría.
+> El journal (`/var/log/journal/*`) se excluye: tiene su propia retención (18.1.1), pesa cientos de MB y es diagnóstico, no datos. El resto de `/var/log` sí entra por su valor forense.
 
-Política de retención:
+La retención (7 diarios, 4 semanales y 6 mensuales, unos 17 archivos) cubre de un día a seis meses y se ajusta a la capacidad del repositorio.
 
-- 7 respaldos diarios (la última semana).
-- 4 respaldos semanales (el último mes).
-- 6 respaldos mensuales (los últimos seis meses).
+##### 20.3.5 Automatización con systemd timer
 
-Total: en cualquier momento hay aproximadamente 17 archivos retenidos, cubriendo desde un día hasta seis meses atrás. Ajustar según necesidades de retención y capacidad del repositorio.
-
-##### 18.3.5 Automatización con systemd timer
-
-systemd timers son preferibles a cron para tareas que requieren coordinación con el resto del sistema (esperar a que la red esté disponible, no correr si el sistema está suspendido, etc.).
-
-Unidad de servicio `/etc/systemd/system/borg-backup.service`:
+Un timer, mejor que cron, espera a la red y no corre con el sistema suspendido. `/etc/systemd/system/borg-backup.service`:
 
 ```bash
 sudoedit /etc/systemd/system/borg-backup.service
 ```
 
-```
+```text
 [Unit]
 Description=Respaldo Borg del servidor
 After=network-online.target
@@ -4092,15 +3812,13 @@ Nice=19
 IOSchedulingClass=idle
 ```
 
-`Nice=19` y `IOSchedulingClass=idle` aseguran que el respaldo no compita con servicios de producción por CPU o I/O.
-
-Timer `/etc/systemd/system/borg-backup.timer`:
+`Nice=19` e `IOSchedulingClass=idle` evitan competir con los servicios. `/etc/systemd/system/borg-backup.timer`:
 
 ```bash
 sudoedit /etc/systemd/system/borg-backup.timer
 ```
 
-```
+```text
 [Unit]
 Description=Respaldo Borg diario
 
@@ -4113,11 +3831,7 @@ Persistent=true
 WantedBy=timers.target
 ```
 
-`RandomizedDelaySec=30m` distribuye la ejecución entre 03:00 y 03:30 — útil si hay múltiples servidores respaldando al mismo destino, evita que todos lleguen a la vez.
-
-`Persistent=true` ejecuta el respaldo al arrancar el sistema si el timer no se disparó porque el servidor estaba apagado en ese momento.
-
-Activar:
+`RandomizedDelaySec=30m` reparte entre 03:00 y 03:30 los respaldos de varios servidores al mismo destino, y `Persistent=true` ejecuta al arrancar el que se perdió con el servidor apagado.
 
 ```bash
 sudo systemctl daemon-reload
@@ -4125,9 +3839,7 @@ sudo systemctl enable --now borg-backup.timer
 sudo systemctl list-timers borg-backup.timer
 ```
 
-#### 18.4 Verificación del repositorio
-
-Borg incluye herramientas para verificar la integridad de los respaldos sin tener que restaurarlos completos:
+#### 20.4 Verificación del repositorio
 
 ```bash
 # Listar archivos en el repositorio
@@ -4140,13 +3852,11 @@ sudo borg info /var/backups/borg-local::nombre-del-archivo
 sudo borg check --verify-data /var/backups/borg-local
 ```
 
-`borg check --verify-data` lee y verifica todos los datos. Es lento (puede tomar horas en repositorios grandes), pero detecta corrupción silenciosa en disco. Se recomienda ejecutarlo mensualmente.
+`borg check --verify-data` lee todos los datos y detecta corrupción silenciosa. Tarda horas en repositorios grandes; se ejecuta una vez al mes.
 
-#### 18.5 Prueba de restauración
+#### 20.5 Prueba de restauración
 
-Esto no es opcional. Un respaldo no probado puede fallar silenciosamente. Establecer una rutina mensual de prueba.
-
-Restauración de un archivo concreto:
+Mensual y obligatoria. Un archivo:
 
 ```bash
 sudo mkdir -p /tmp/restore-test
@@ -4155,75 +3865,64 @@ sudo borg extract /var/backups/borg-local::nombre-del-archivo etc/ssh/sshd_confi
 ls etc/ssh/sshd_config
 ```
 
-Restauración de un directorio completo:
+Un directorio:
 
 ```bash
 sudo borg extract /var/backups/borg-local::nombre-del-archivo etc/
 diff -r /etc /tmp/restore-test/etc | head -20
 ```
 
-Las diferencias son normales (logs nuevos, archivos de runtime). Lo importante es que la extracción funcione y que los archivos críticos estén ahí.
-
-Tras la prueba, limpiar:
+Las diferencias de logs y archivos de ejecución son normales; lo que importa es que la extracción funcione y estén los archivos críticos. Después se limpia y se anota el resultado:
 
 ```bash
 sudo rm -rf /tmp/restore-test
 ```
 
-Documentar el resultado de cada prueba en un registro operativo.
+#### 20.6 Restauración del servidor desde cero
 
-#### 18.6 Restauración del servidor desde cero
-
-Procedimiento de alto nivel para reconstruir el servidor si se pierde completamente:
-
-1. Instalar Debian 13 base siguiendo las partes I y II del manual, hasta tener un sistema arrancable con SSH.
+1. Instalar Debian 13 con las etapas I y II, hasta tener SSH.
 2. Instalar borgbackup.
-3. Recuperar la passphrase del repositorio desde el gestor de contraseñas.
-4. Apuntar al repositorio remoto: `borg list backup@servidor-backup.example.com:/srv/borg/<hostname>`.
-5. Restaurar `/etc`, `/root`, `/home`: `sudo borg extract <repo>::<archivo>`.
-6. Reinstalar paquetes: `sudo dpkg --set-selections < /root/paquetes-completo.txt && sudo apt-get dselect-upgrade`.
-7. Restaurar datos específicos del rol (bases de datos, sitios, etc.).
-8. Verificar servicios y reanudar operaciones.
+3. Recuperar la passphrase del gestor de contraseñas.
+4. Listar el repositorio remoto: `borg list backup@servidor-backup.example.com:/srv/borg/<hostname>`.
+5. Restaurar `/etc`, `/root` y `/home`: `sudo borg extract <repo>::<archivo>`.
+6. Reinstalar paquetes: `sudo cat /root/paquetes-completo.txt | sudo dpkg --set-selections && sudo apt-get dselect-upgrade` (20.2.1).
+7. Restaurar los datos del rol.
+8. Verificar los servicios.
 
-Este procedimiento debe estar documentado en un runbook accesible incluso si el servidor está caído (en otro sistema, en papel, en el gestor de contraseñas del equipo).
+Este procedimiento se guarda donde siga accesible con el servidor caído (22.3.2).
 
-### 19. Reenvío de correo del sistema con `msmtp`
+### 21. Reenvío de correo del sistema con `msmtp`
 
-`unattended-upgrades` (14.3), `rkhunter`, `debsums`, `aide` (12) y el script de alertas (17.2) envían correo a `root`. Sin configuración adicional, esos mensajes quedan en `/var/mail/root`, donde casi nadie los lee. Esta sección reenvía el correo de cualquier usuario local a una dirección externa mediante un relay SMTP autenticado. El servidor solo envía; no recibe. Se usa `msmtp` porque es solo un transmisor: sin demonio en escucha ni cola propia.
+`unattended-upgrades` (16.3), `debsums`, AIDE (14) y las alertas (19.2) escriben a root, y sin reenvío se quedan en `/var/mail/root`. Esta sección envía el correo local a una dirección externa por un relay SMTP autenticado. El servidor solo envía. `msmtp` es solo un transmisor, sin demonio en escucha ni cola.
 
-#### 19.1 Decisiones de diseño
+#### 21.1 Decisiones de diseño
 
-- Aliases en `/etc/msmtp/aliases`, no en `/etc/aliases`: msmtp no lee el archivo tradicional, y sin traducción el relay rechaza destinatarios como `root`.
-- Logs en journald (sección 16.1), no en archivo dedicado: evita problemas de permisos con usuarios no-root y no requiere logrotate.
-- Gmail con app password como ejemplo concreto (19.4.1). Outlook/Hotmail personales quedan fuera porque exigen XOAUTH2.
+- Aliases en `/etc/msmtp/aliases`: msmtp no lee `/etc/aliases`, y sin traducción el relay rechaza destinatarios como `root`.
+- Logs en journald (18.1), sin archivo propio, que daría problemas de permisos y pediría logrotate.
+- Outlook y Hotmail personales quedan fuera porque exigen XOAUTH2.
 
-#### 19.2 Requisitos previos
+#### 21.2 Requisitos previos
 
-- Relay SMTP con autenticación estándar (corporativo, Mailgun, Brevo, Amazon SES, Gmail).
-- Usuario y contraseña del relay.
-- Dirección `From` autorizada en el relay.
-- Dirección de destino para el correo del sistema.
+Un relay con autenticación estándar (corporativo, Mailgun, Brevo, Amazon SES, Gmail), su usuario y contraseña, una dirección `From` autorizada y la dirección de destino.
 
-#### 19.3 Instalación
+#### 21.3 Instalación
 
 ```bash
 sudo apt install -y msmtp msmtp-mta mailutils
 ```
 
-`msmtp-mta` convierte `/usr/sbin/sendmail` en un enlace a msmtp, de modo que cron y cualquier programa que use `sendmail` envían por msmtp. `mailutils` aporta el comando `mail`.
+`msmtp-mta` enlaza `/usr/sbin/sendmail` a msmtp, así que cron y cualquier programa envían por él. `mailutils` aporta `mail`.
 
-##### 19.3.1 Retiro de `exim4` y `bsd-mailx`
+##### 21.3.1 Retiro de `exim4` y `bsd-mailx`
 
-La sección 12.2 instala `rkhunter`, cuyas Recommends traen `exim4` (como `default-mta`) y `bsd-mailx`. Al instalar `msmtp-mta`, apt retira los tres paquetes de `exim4`, pero los deja en estado `rc` con su configuración en `/etc/exim4/`. `bsd-mailx`, por su parte, tiene prioridad 50 frente a 30 de `mailutils` en la alternativa `mailx`, así que `/usr/bin/mail` seguiría apuntando a él. Como `mailutils` ya satisface la recomendación de `rkhunter`, se retiran ambos:
+Si algún paquete trajo `exim4` y `bsd-mailx` por sus Recommends, como `cron` en algunas imágenes cloud, apt retira `exim4` al instalar `msmtp-mta` pero lo deja en `rc`, y `bsd-mailx` (prioridad 50 frente a 30 de `mailutils`) seguiría siendo `/usr/bin/mail`:
 
 ```bash
 sudo apt -y purge exim4-base exim4-config exim4-daemon-light bsd-mailx
 sudo apt -y autoremove --purge
 ```
 
-> `autoremove` ejecutado antes de instalar `msmtp-mta` no retira nada: mientras `exim4` sea el único MTA, apt lo considera necesario. El buzón `/var/mail/root` se conserva; conviene revisarlo una vez con `sudo less /var/mail/root`.
-
-Verificar:
+> Antes de instalar `msmtp-mta`, `autoremove` no retira nada, porque `exim4` era el único MTA. El buzón `/var/mail/root` se conserva; conviene leerlo una vez con `sudo less /var/mail/root`.
 
 ```bash
 dpkg -l 'exim4*' | grep -E '^(ii|rc)' || echo "exim4 eliminado por completo"
@@ -4234,16 +3933,16 @@ sudo ss -tlnp | grep ':25\b' || echo "nada escucha en el puerto 25"
 
 Salida esperada:
 
-```
+```text
 exim4 eliminado por completo
 /usr/bin/msmtp
 /usr/bin/mail.mailutils
 nada escucha en el puerto 25
 ```
 
-#### 19.4 Configuración global de msmtp
+#### 21.4 Configuración global de msmtp
 
-La variable del puerto se llama `MIPUERTO_SMTP` para no pisar `MIPUERTO`, que es el puerto SSH (sección 8). `ASSETS_BASE` se define en la Parte I.
+`MIPUERTO_SMTP` no pisa `MIPUERTO`, el de SSH. `ASSETS_BASE` es el de la sección 3.
 
 ```bash
 export MIRELAY=smtp.relay.example.com
@@ -4258,98 +3957,95 @@ sed -e "s|\$MIRELAY|${MIRELAY}|g" \
     -e "s|\$MIUSUARIO_SMTP|${MIUSUARIO_SMTP}|g" \
     -e "s|\$MIFROM|${MIFROM}|g" \
     /tmp/plantilla-etc-msmtprc.txt \
-    | sudo tee /etc/msmtprc > /dev/null
+    | sudo install -m 0640 -o root -g msmtp /dev/stdin /etc/msmtprc
 
 # Comprobar que no quedó ningún marcador sin sustituir
 sudo grep -n '\$MI[A-Z_]*' /etc/msmtprc || echo "✓ plantilla aplicada"
-
-sudo chmod 0640 /etc/msmtprc
-sudo chown root:msmtp /etc/msmtprc
+sudo ls -l /etc/msmtprc
 ```
 
-Fijar el remitente. mailutils pasa a sendmail su propio remitente (`-f usuario@FQDN`), que un relay estricto rechaza; `allow_from_override off` obliga a msmtp a usar siempre el `from` configurado. La plantilla v1.2 ya lo incluye; con versiones anteriores se añade así (el comando es idempotente):
+`install` escribe con propietario y permisos definitivos, sin depender de la umask (9.4), y el bloque se puede repetir. El `ls` debe mostrar `-rw-r----- 1 root msmtp`.
+
+mailutils pasa a sendmail su propio remitente (`-f usuario@FQDN`), que un relay estricto rechaza; `allow_from_override off` obliga a usar el `from` configurado. La plantilla v1.2 ya lo trae, y con ella este comando no hace nada:
 
 ```bash
 sudo grep -q '^allow_from_override' /etc/msmtprc || sudo sed -i '/^aliases/a allow_from_override off' /etc/msmtprc
 ```
 
-> `allow_from_override` fija el remitente del envelope. Si el relay valida también la cabecera `From:` (Amazon SES y algunos corporativos lo hacen; Gmail la reescribe por su cuenta), añadir además `set_from_header on` en el bloque `defaults`.
+> `allow_from_override` fija el remitente del envelope. Si el relay valida también la cabecera `From:` (Amazon SES y algunos corporativos; Gmail la reescribe), se añade `set_from_header on` en `defaults`.
 
-##### 19.4.1 Caso particular: Gmail con app password
+> **Ejemplo con Gmail.** Variables:
+>
+> ```bash
+> export MIRELAY=smtp.gmail.com
+> export MIPUERTO_SMTP=587
+> export MIUSUARIO_SMTP=tu-cuenta@gmail.com
+> export MIFROM=tu-cuenta@gmail.com
+> ```
+>
+> Requiere la verificación en dos pasos (<https://myaccount.google.com/security>) y una app password generada en <https://myaccount.google.com/apppasswords>, que se muestra una sola vez y se usa en 21.5. Da acceso completo a la cuenta, así que conviene una cuenta dedicada a notificaciones; el límite de 500 destinatarios diarios no afecta a las alertas.
 
-```bash
-export MIRELAY=smtp.gmail.com
-export MIPUERTO_SMTP=587
-export MIUSUARIO_SMTP=tu-cuenta@gmail.com
-export MIFROM=tu-cuenta@gmail.com
-```
-
-1. Activar la verificación en dos pasos en <https://myaccount.google.com/security>.
-2. Generar una app password en <https://myaccount.google.com/apppasswords> con un nombre descriptivo (ej. `msmtp-mandarina`). Se muestra una sola vez: guardarla en el gestor de contraseñas.
-3. Usar esa clave de 16 caracteres en 19.5.
-
-Gmail limita las cuentas gratuitas a 500 destinatarios diarios, irrelevante para alertas. La app password da acceso completo a la cuenta; es preferible una cuenta dedicada solo a notificaciones.
-
-#### 19.5 Contraseña del relay
+#### 21.5 Contraseña del relay
 
 ```bash
 sudo install -d -o root -g msmtp -m 0750 /etc/msmtp
-printf '%s' 'la-contraseña-o-app-password' | sudo tee /etc/msmtp/password > /dev/null
-sudo chmod 0640 /etc/msmtp/password
-sudo chown root:msmtp /etc/msmtp/password
+read -rsp 'Contraseña del relay: ' MIPASS_SMTP; echo
+printf '%s' "${MIPASS_SMTP:?}" | sudo install -m 0640 -o root -g msmtp /dev/stdin /etc/msmtp/password
+unset MIPASS_SMTP
 sudo ls -la /etc/msmtp/
 ```
 
-`printf '%s'` evita el salto de línea final que añadiría `echo`. Salida esperada:
+`read -rs` la pide sin eco y sin dejarla en el historial; `printf '%s'` evita el salto de línea final. Repetir el bloque la sustituye, que es lo que se quiere al rotarla. Salida esperada:
 
-```
+```text
 drwxr-x--- 2 root msmtp 4096 ... .
 -rw-r----- 1 root msmtp   XX ... password
 ```
 
-#### 19.6 Aliases para destinatarios locales
+#### 21.6 Aliases para destinatarios locales
 
 ```bash
 export MIDESTINO=admin@example.com
 
-sudo tee /etc/msmtp/aliases > /dev/null <<EOF
+sudo install -m 0644 -o root -g root /dev/stdin /etc/msmtp/aliases <<EOF
 # Aliases de msmtp: <local>: <externa>
 root: ${MIDESTINO:?}
 default: ${MIDESTINO}
 EOF
 
-sudo chmod 0644 /etc/msmtp/aliases
-sudo chown root:root /etc/msmtp/aliases
 sudo grep '^aliases' /etc/msmtprc
 ```
 
-`default:` captura cualquier otro usuario local (`postmaster`, `daemon`, cuentas de servicio). El `grep` debe devolver `aliases         /etc/msmtp/aliases`; si no aparece:
+`default:` recoge cualquier otro usuario local. El `grep` debe devolver `aliases         /etc/msmtp/aliases`; si no:
 
 ```bash
-sudo sed -i '/^timeout/a aliases         /etc/msmtp/aliases' /etc/msmtprc
+sudo grep -q '^aliases' /etc/msmtprc || sudo sed -i '/^timeout/a aliases         /etc/msmtp/aliases' /etc/msmtprc
 ```
 
-El perfil de AppArmor que msmtp trae en Debian 13 está en modo enforce y no permite leer `/etc/msmtp/aliases`. Sin este override, todo envío a un destinatario local falla con `Permiso denegado` y exit 78. La denegación no aparece ni en `journalctl -k` ni en `ausearch`.
+El perfil de AppArmor de msmtp en Debian 13 está en enforce y no permite leer `/etc/msmtp/aliases`: sin este override, todo envío a un destinatario local falla con `Permiso denegado` y exit 78.
 
 ```bash
-echo '/etc/msmtp/aliases r,' | sudo tee -a /etc/apparmor.d/local/usr.bin.msmtp > /dev/null
+sudo grep -qxF '/etc/msmtp/aliases r,' /etc/apparmor.d/local/usr.bin.msmtp \
+  || echo '/etc/msmtp/aliases r,' | sudo tee -a /etc/apparmor.d/local/usr.bin.msmtp > /dev/null
 sudo apparmor_parser -r /etc/apparmor.d/usr.bin.msmtp
 ```
 
-#### 19.7 Configuración de mailutils
+El `grep` evita duplicar la línea. El archivo local lo crea vacío el paquete y el perfil lo incluye, así que `tee -a` conserva sus permisos (0644).
+
+#### 21.7 Configuración de mailutils
 
 ```bash
-sudo tee /etc/mail.rc > /dev/null <<'EOF'
+sudo install -m 0644 -o root -g root /dev/stdin /etc/mail.rc <<'EOF'
 set sendmail="sendmail:///usr/sbin/sendmail"
 set sendwait
 EOF
 ```
 
-En mailutils, `sendmail` es una URL de mailer, no una ruta. Con la ruta a secas (`/usr/sbin/sendmail`), mailutils ejecuta el programa sin pasarle destinatarios y msmtp responde `no se encontraron destinatarios`. `sendwait` hace que `mail` espere el resultado y muestre los errores.
+En mailutils, `sendmail` es una URL de mailer: con la ruta a secas ejecuta el programa sin destinatarios y msmtp responde `no se encontraron destinatarios`. `sendwait` hace que `mail` espere y muestre los errores.
 
-#### 19.8 Grupo `msmtp` para el usuario administrativo
+#### 21.8 Grupo `msmtp` para el usuario administrativo
 
-Permite enviar correo de prueba sin `sudo`. Los servicios del sistema corren como root y no lo necesitan.
+Permite enviar correo de prueba sin `sudo`.
 
 ```bash
 sudo usermod -aG msmtp "${MIUSUARIO:?}"
@@ -4358,9 +4054,9 @@ exit
 id -nG | grep -qw msmtp && echo "✓ grupo msmtp cargado" || echo "✗ reabrir sesión o usar sudo"
 ```
 
-#### 19.9 Prueba de envío directo
+#### 21.9 Prueba de envío directo
 
-Probar primero msmtp sin intermediarios y después a través de `mail`. Si el primero funciona y el segundo no, el problema está en 19.7.
+Primero msmtp solo y después con `mail`; si el primero funciona y el segundo no, el problema es 21.7.
 
 ```bash
 printf 'To: %s\nSubject: Prueba sendmail directo\n\nCuerpo de prueba.\n' "${MIDESTINO:?}" | /usr/sbin/sendmail -t; echo "exit=$?"
@@ -4368,33 +4064,33 @@ echo "Prueba desde $(hostname) a $(date)." | mail -s "Prueba de msmtp desde $(ho
 sudo journalctl -t msmtp -n 2
 ```
 
-Cada envío debe dejar una línea con `smtpstatus=250`, `recipients=` igual a la dirección de destino y `from=` igual al `from` de `/etc/msmtprc`. Si msmtp no llega a registrar nada, falló antes de conectar: el error aparece en la terminal.
+Cada envío deja una línea con `smtpstatus=250`, `recipients=` con el destino y `from=` con el de `/etc/msmtprc`. Si no aparece nada, falló antes de conectar y el error está en la terminal.
 
 | Mensaje | Causa probable | Solución |
 |---|---|---|
-| `argumento inválido 587_SMTP para la orden port` | Sustitución incompleta de la plantilla | Revisar el `sed` de 19.4 y ejecutar su verificación |
-| `no se encontraron destinatarios` (solo con `mail`) | `set sendmail` con ruta en vez de URL | Corregir `/etc/mail.rc` según 19.7; `mail -n` (sin `mail.rc`) lo confirma |
-| `/etc/msmtp/aliases: Permiso denegado`, exit 78 | AppArmor bloquea la lectura de los aliases | Override de 19.6 |
+| `argumento inválido 587_SMTP para la orden port` | Sustitución incompleta de la plantilla | Revisar el `sed` de 21.4 y ejecutar su verificación |
+| `no se encontraron destinatarios` (solo con `mail`) | `set sendmail` con ruta en vez de URL | Corregir `/etc/mail.rc` según 21.7; `mail -n` (sin `mail.rc`) lo confirma |
+| `/etc/msmtp/aliases: Permiso denegado`, exit 78 | AppArmor bloquea la lectura de los aliases | Override de 21.6 |
 | `authentication failed` | Usuario o contraseña incorrectos | Revisar `/etc/msmtp/password` y `user`; en Gmail, usar app password |
 | `basic authentication is disabled` | El relay exige OAuth2 (Microsoft 365, Outlook) | Cambiar de relay o implementar XOAUTH2 |
 | `connection refused` | Host, puerto o firewall | Revisar `host` y `port`; `nc -vz <host> <puerto>` |
 | `sender address not allowed` | `from` no autorizado en el relay | Usar una dirección autorizada; confirmar `allow_from_override off` y, si aplica, `set_from_header on` |
 | `TLS handshake failed` | Certificado del relay no confiable | Revisar `tls_trust_file` |
 | `not a valid RFC 5321 address` | Destinatario local sin traducir | Revisar `/etc/msmtp/aliases` y la directiva `aliases` |
-| `cannot log to /var/log/msmtp.log` | `logfile` activado sin permisos | Comentar `logfile`; la plantilla ya viene así |
+| `cannot log to /var/log/msmtp.log`, o el archivo existe pero sigue vacío | `logfile` activado sin el archivo creado, o sin la regla de AppArmor de 21.13 | Seguir los pasos de 21.13 o volver a comentar `logfile` |
 
-#### 19.10 Prueba de redirección de aliases
+#### 21.10 Prueba de redirección de aliases
 
 ```bash
 echo "Prueba de redirección de root a $(date)" | mail -s "Test redirección root" root
 sudo journalctl -t msmtp -n 1
 ```
 
-La línea debe mostrar `recipients=` con la dirección de `MIDESTINO`, no `recipients=root`. Si el envío falla con `Permiso denegado`, falta el override de AppArmor de 19.6.
+`recipients=` debe ser la dirección de `MIDESTINO`, no `root`. Con `Permiso denegado`, falta el override de 21.6.
 
-#### 19.11 Prueba con el flujo completo del sistema
+#### 21.11 Prueba con el flujo completo del sistema
 
-Requiere el script de la sección 17.2. Se fuerza una alerta bajando temporalmente el umbral de disco:
+Con el script de 19.2, bajando el umbral de disco:
 
 ```bash
 df -h /
@@ -4402,7 +4098,7 @@ sudo sed -i 's/-ge 85/-ge 1/' /etc/cron.hourly/server-check
 sudo /etc/cron.hourly/server-check
 ```
 
-La alerta debe llegar al correo externo en pocos segundos. Restaurar:
+La alerta debe llegar en segundos. Se restaura:
 
 ```bash
 sudo sed -i 's/-ge 1/-ge 85/' /etc/cron.hourly/server-check
@@ -4411,14 +4107,14 @@ sudo /etc/cron.hourly/server-check; echo "exit=$?"
 
 La segunda ejecución debe terminar sin salida y con `exit=0`.
 
-#### 19.12 Consideraciones de seguridad
+#### 21.12 Consideraciones de seguridad
 
-- `/etc/msmtp/password` es la pieza más sensible: usar una credencial dedicada al servidor y rotarla al reinstalar o ante sospecha de exposición.
-- Los correos pueden incluir información sensible (paquetes con CVE pendientes, archivos modificados, IPs baneadas); el destino debe ser una dirección controlada.
-- UFW no necesita reglas, porque la política saliente es `allow outgoing` (sección 9). Si se restringe el tráfico saliente, abrir 587 o 465 hacia el relay.
-- Si el relay admite OAuth2 o certificado de cliente, son preferibles a usuario y contraseña.
+- `/etc/msmtp/password` es lo más sensible: una credencial dedicada al servidor, que se rota al reinstalar o ante sospecha.
+- Los correos pueden llevar información sensible (CVE pendientes, archivos cambiados, IPs baneadas): el destino debe ser una dirección controlada.
+- Con `allow outgoing` (11) UFW no necesita reglas; si se filtra la salida, se abren 587 o 465 hacia el relay.
+- OAuth2 o certificado de cliente, si el relay los admite, son preferibles a la contraseña.
 
-#### 19.13 Logs
+#### 21.13 Logs
 
 ```bash
 sudo journalctl -t msmtp -n 50              # últimos envíos
@@ -4426,13 +4122,16 @@ sudo journalctl -t msmtp -p err             # solo errores
 sudo journalctl -t msmtp --since "1 hour ago"
 ```
 
-La retención la gobierna journald (sección 16.1). Si se necesita un log dedicado para depuración puntual:
+La retención es la de journald (18.1). Solo para una depuración puntual se activa un log propio:
 
 ```bash
-sudoedit /etc/msmtprc                       # descomentar: logfile /var/log/msmtp.log
+sudo sed -i 's|^#\s*logfile .*|logfile         /var/log/msmtp.log|' /etc/msmtprc
 sudo install -o root -g msmtp -m 0660 /dev/null /var/log/msmtp.log
+sudo grep -qxF '/var/log/msmtp.log wk,' /etc/apparmor.d/local/usr.bin.msmtp \
+  || echo '/var/log/msmtp.log wk,' | sudo tee -a /etc/apparmor.d/local/usr.bin.msmtp > /dev/null
+sudo apparmor_parser -r /etc/apparmor.d/usr.bin.msmtp
 
-sudo tee /etc/logrotate.d/msmtp > /dev/null <<'EOF'
+sudo install -m 0644 -o root -g root /dev/stdin /etc/logrotate.d/msmtp <<'EOF'
 /var/log/msmtp.log {
     weekly
     rotate 8
@@ -4445,27 +4144,45 @@ sudo tee /etc/logrotate.d/msmtp > /dev/null <<'EOF'
 EOF
 ```
 
-> Aun con permisos correctos, msmtp puede advertir `cannot log to /var/log/msmtp.log` cuando lo invoca un usuario no-root. El correo se entrega igual; si molesta, volver a comentar `logfile`.
+```bash
+msmtp --pretend </dev/null | grep '^logfile ='
+```
 
-### 20. Documentación operativa
+Debe mostrar `logfile = /var/log/msmtp.log`; si la línea lleva algo detrás, msmtp lo toma como parte del nombre. La regla de AppArmor hace falta porque el perfil solo permite escribir en `/var/log/msmtp`, sin extensión: sin ella el correo sale y llega al journal, pero el archivo queda vacío y la única huella es la denegación en `audit.log` (15.3):
 
-Las secciones anteriores configuraron el servidor; esta deja por escrito qué se configuró, por qué, y cómo operarlo. Sin documentación, un servidor administrable se convierte en un servidor "que solo entiende quien lo desplegó" — y el día que esa persona no esté disponible (vacaciones, cambio de rol, accidente), la organización se queda sin capacidad real de operación.
+```bash
+sudo grep -h 'apparmor="DENIED"' /var/log/audit/audit.log* | grep 'msmtp.log'
+```
 
-El alcance de esta sección es deliberadamente modesto. No se documenta cada decisión de hardening (eso lo hace el propio manual que se está siguiendo), ni se reproducen los checklists individuales de cada sección (esos ya quedaron donde corresponden). Lo que se documenta aquí es lo que sobrevive más allá del manual: el inventario propio de este servidor concreto, su diagrama lógico, y un runbook básico de operaciones rutinarias.
+```text
+type=AVC msg=audit(...): apparmor="DENIED" operation="open" class="file" profile="msmtp" name="/var/log/msmtp.log" comm="sendmail" requested_mask="ac" denied_mask="ac" ...
+```
 
-Tres principios atraviesan esta sección:
+Con la regla, cada envío deja una línea, lo lance root o un usuario del grupo `msmtp`:
 
-1. La documentación vive fuera del servidor que documenta. Si el servidor cae, la documentación debe seguir accesible. El sitio adecuado es un repositorio de la organización (Git interno, Wiki corporativa, gestor de contraseñas con notas largas), no archivos en el propio servidor que se está documentando.
+```bash
+echo "prueba" | sudo mail -s "log msmtp root" root
+echo "prueba" | mail -s "log msmtp usuario" root
+sudo tail -2 /var/log/msmtp.log
+```
 
-2. El manual base documenta lo genérico; los manuales de rol documentan lo específico. Un servidor de mail tiene un runbook de mail; un servidor web tiene el suyo; este manual base solo documenta lo que aplica a cualquier servidor Debian endurecido. Las acciones específicas del rol viven en sus manuales correspondientes.
+Para desactivarlo:
 
-3. La documentación se actualiza con el sistema. Si hoy se cambia una IP, mañana se añade un servicio o el mes siguiente se modifica una regla de firewall, esos cambios deben reflejarse en la documentación en el mismo momento. Documentación desactualizada es peor que no tener documentación, porque se confía en ella.
+```bash
+sudo sed -i 's|^logfile .*|# logfile         /var/log/msmtp.log|' /etc/msmtprc
+sudo rm -f /var/log/msmtp.log /etc/logrotate.d/msmtp
+sudo sed -i '\#^/var/log/msmtp.log wk,$#d' /etc/apparmor.d/local/usr.bin.msmtp
+sudo apparmor_parser -r /etc/apparmor.d/usr.bin.msmtp
+msmtp --pretend </dev/null | grep '^logfile ='     # logfile = (no seleccionado)
+```
 
-#### 20.1 Inventario del servidor
+Retirar la regla es opcional; en el archivo local debe quedar al menos la línea de los aliases de 21.6.
 
-El inventario es la "ficha técnica" del servidor: qué es, qué tiene, dónde está. Sirve para que cualquier administrador autorizado pueda situarse rápidamente sin tener que descubrir todo desde cero.
+### 22. Documentación operativa
 
-El inventario mínimo para un servidor base incluye:
+Lo que se configuró, por qué y cómo operarlo, para que el servidor no dependa de quien lo desplegó. No se repite el manual: se documenta lo propio de cada servidor, es decir, su inventario, su diagrama y su runbook. La documentación vive fuera del servidor (repositorio, wiki o gestor de contraseñas), lo genérico queda en el manual base y lo del rol en el suyo, y se actualiza en el mismo momento que el sistema, porque la desactualizada es peor que ninguna.
+
+#### 22.1 Inventario del servidor
 
 | Campo                        | Ejemplo                                                             | Origen                                     |
 |------------------------------|---------------------------------------------------------------------|--------------------------------------------|
@@ -4478,9 +4195,7 @@ El inventario mínimo para un servidor base incluye:
 | Puerto SSH                   | `17177`                                                             | `/etc/ssh/sshd_config.d/01-hardening.conf` |
 | Usuario administrativo       | `usuario`                                                           | manual                                     |
 | Fecha de despliegue          | `2026-05-27`                                                        | conocida por el operador                   |
-| Versión del manual seguido   | `v0.2`                                                              | encabezado del manual                      |
-
-Comandos útiles para extraer el inventario actualizado del servidor:
+| Versión del manual seguido   | `v0.10`                                                             | historial del manual                       |
 
 ```bash
 hostnamectl
@@ -4491,15 +4206,11 @@ sudo apt-mark showmanual | wc -l    # número de paquetes instalados manualmente
 uptime -s                            # fecha del último arranque
 ```
 
-El inventario se mantiene en una nota o documento del repositorio operativo (Wiki, Git interno, gestor de contraseñas con notas largas), no en el propio servidor. La razón es práctica: si el servidor cae, el inventario debe seguir accesible.
+#### 22.2 Diagrama lógico
 
-#### 20.2 Diagrama lógico
+Responde de un vistazo qué puertos están expuestos, desde dónde se entra y qué corre. En un servidor base es casi trivial:
 
-Un diagrama lógico responde rápidamente a preguntas como "¿qué puertos están expuestos?", "¿desde dónde se accede?", "¿qué servicios corren?". En un servidor base sin rol específico, el diagrama es muy simple — apenas el servidor mismo, su interfaz de red, y los puertos abiertos. Cuando se añadan roles (web, mail, base de datos), el diagrama se complica y conviene mantenerlo actualizado.
-
-Un diagrama básico de un servidor recién desplegado siguiendo este manual luce así (en notación de texto plano):
-
-```
+```text
             Internet / LAN
                   │
                   ▼
@@ -4525,25 +4236,13 @@ Un diagrama básico de un servidor recién desplegado siguiendo este manual luce
             smtp.gmail.com:587
 ```
 
-Para diagramas más visuales, herramientas como [Excalidraw](https://excalidraw.com/), [draw.io](https://app.diagrams.net/) o [Mermaid](https://mermaid.live/) generan SVG/PNG mantenibles. La elección importa menos que mantener la coherencia: usar siempre la misma herramienta facilita la lectura y la edición.
+Excalidraw, draw.io o Mermaid sirven para versiones gráficas; importa más usar siempre la misma. Debe decir el hostname y la IP, los puertos expuestos y a qué redes, los servicios, con qué otros sistemas habla (relay, respaldos, monitoreo) y por dónde entra la administración. Lo demás vive en el manual o en el inventario de paquetes (20.2.1).
 
-Un buen diagrama responde a estas preguntas sin que haya que abrirlo dos veces:
+#### 22.3 Runbook básico
 
-- ¿Qué hostname y qué IP tiene el servidor?
-- ¿Qué puertos están expuestos hacia el exterior y hacia qué redes?
-- ¿Qué servicios corren en él?
-- ¿Con qué otros sistemas se comunica (relay SMTP, servidor de respaldos, monitoreo central, etc.)?
-- ¿Por dónde entra la administración (SSH, VPN)?
+Tres operaciones que aplican a cualquier servidor; las del rol van en su manual.
 
-Lo que un diagrama no necesita en este nivel: detalles internos del kernel, listas exhaustivas de paquetes, configuraciones específicas. Eso vive en el manual o en el inventario de paquetes (sección 18.2.1).
-
-#### 20.3 Runbook básico
-
-Un runbook documenta cómo se hacen las operaciones cotidianas del servidor. Para un servidor base, el runbook es corto porque no hay rol que operar; los runbooks largos vienen con los manuales específicos. Aun así, hay tres operaciones que aplican a cualquier servidor y conviene tener documentadas:
-
-##### 20.3.1 Reinicio controlado
-
-Reiniciar el servidor no es operación rutinaria, pero ocurre. Los pasos para hacerlo de forma ordenada:
+##### 22.3.1 Reinicio controlado
 
 ```bash
 # 1. Verificar que no hay actualizaciones a medio aplicar
@@ -4566,179 +4265,58 @@ sudo systemctl --failed
 sudo journalctl -b -p err --no-pager | head -20
 ```
 
-Si el servidor usa LUKS con unlock remoto (sección 2.4), recordar que tras el reinicio hay que hacer el unlock desde otra máquina antes de que SSH normal esté disponible.
+Con LUKS y desbloqueo remoto (2.4), el desbloqueo va antes de que responda el SSH normal.
 
-##### 20.3.2 Restauración tras desastre
+##### 22.3.2 Restauración tras desastre
 
-El procedimiento completo está en la sección 18.6, pero conviene tener el resumen accesible en el runbook para no buscarlo en el manual completo en mitad de un incidente:
+Resumen de 20.6, para tenerlo a mano en mitad de un incidente:
 
-1. Instalar Debian 13 base siguiendo Partes I y II del manual.
-2. Instalar borgbackup y recuperar la passphrase del repositorio del gestor de contraseñas.
-3. Listar los respaldos disponibles: `borg list <repositorio>`.
-4. Restaurar `/etc`, `/root`, `/home`, `/var/spool/cron`: `borg extract <repo>::<archivo>`.
-5. Reinstalar paquetes del archivo de selecciones:
+1. Instalar Debian 13 con las etapas I y II.
+2. Instalar borgbackup y recuperar la passphrase del gestor de contraseñas.
+3. Listar los respaldos: `borg list <repositorio>`.
+4. Restaurar `/etc`, `/root`, `/home` y `/var/spool/cron`: `borg extract <repo>::<archivo>`.
+5. Reinstalar paquetes:
 
    ```bash
    sudo cat /root/paquetes-completo.txt | sudo dpkg --set-selections
    sudo apt-get dselect-upgrade
    ```
 
-6. Restaurar datos específicos del rol (si los hubiese).
-7. Verificar servicios y reanudar operaciones.
+6. Restaurar los datos del rol.
+7. Verificar los servicios.
 
-El runbook debe identificar claramente dónde está la passphrase del repositorio Borg y dónde están los datos de acceso al servidor de respaldos remoto. Sin esos dos elementos, la restauración no es posible.
+El runbook dice dónde están la passphrase del repositorio y el acceso al servidor de respaldos; sin ellos no hay restauración.
 
-##### 20.3.3 Acceso de emergencia
+##### 22.3.3 Acceso de emergencia
 
-Si SSH falla, fail2ban banea por error la IP del administrador, o un cambio en UFW corta el acceso, conviene tener documentado:
+- Cómo entrar por la consola física o la del hipervisor o el proveedor, y cómo arrancar en modo rescate.
+- Root está bloqueado (9.6): la emergencia se resuelve con `sudo` desde el usuario administrativo.
+- IP propia baneada por fail2ban: desde la consola, `sudo fail2ban-client unban <ip>` o `sudo fail2ban-client set sshd unbanip <ip>`.
+- Bloqueo de `pam_faillock` (9.3.3): con `silent` parece una contraseña incorrecta. SSH por llave sigue funcionando, pero sin root nadie puede ejecutar `faillock --reset` salvo desde una shell de root ya abierta, y la consola pasa por el mismo `pam_faillock`. Se espera a `unlock_time`; el modo rescate solo si el bloqueo persiste.
 
-- Cómo acceder a la consola física o a la consola del hypervisor / VPS.
-- Cómo reiniciar el servidor en modo single-user o rescue mode si fuera necesario.
-- Las credenciales de root (donde sea que estén guardadas, típicamente en el gestor de contraseñas de la organización; en este manual la cuenta de root está bloqueada al final de la Etapa II, así que el acceso de emergencia es vía sudo desde el usuario administrativo, lo cual cambia el procedimiento).
-- En caso de IP baneada por fail2ban: desde la consola física, ejecutar `sudo fail2ban-client unban <ip>` o `sudo fail2ban-client set sshd unbanip <ip>`.
-- En caso de bloqueo de `pam_faillock` sobre el usuario administrativo (7.3.3): con `silent`, sudo responde igual que ante una contraseña incorrecta. El bloqueo expira solo tras `unlock_time` y el acceso SSH por llave sigue funcionando, pero con root bloqueado (7.6) nadie puede ejecutar `faillock --reset` antes de ese plazo, salvo desde una shell de root que ya estuviera abierta. La consola del hypervisor / VPS tampoco es un atajo, porque el login de consola pasa por el mismo `pam_faillock`. Lo razonable es esperar; el modo rescate solo se justifica si el bloqueo persiste más allá de `unlock_time`.
+#### 22.4 Mantenimiento de la documentación
 
-#### 20.4 Mantenimiento de la documentación
-
-Documentación desactualizada es peor que no tenerla. Hay que cuidar el ciclo de actualización:
-
-- Cada cambio de configuración significativo (IP, puerto, servicio nuevo, política de firewall) actualiza el inventario y el diagrama en el mismo momento.
-- Las pruebas periódicas de restauración (sección 18.5) son una buena oportunidad para confirmar que el runbook sigue siendo correcto: si los pasos documentados ya no funcionan, el runbook no refleja la realidad.
-- El propio manual base que se está siguiendo cambia con el tiempo (versiones nuevas, correcciones, actualizaciones del propio Debian). Anotar en el inventario qué versión del manual se usó al desplegar este servidor permite saber, años más tarde, qué decisiones se tomaron y cuáles podrían necesitar revisión.
+Cada cambio de IP, puerto, servicio o firewall actualiza inventario y diagrama en el momento. Las pruebas de restauración (20.5) sirven para comprobar que el runbook sigue valiendo. La versión del manual usada en el despliegue queda en el inventario, para saber más adelante qué decisiones se tomaron.
 
 ### Cierre de la Etapa IV
 
-Al terminar esta parte, el servidor opera de forma sostenible y queda documentado:
+- Actualizaciones automáticas con aviso y reinicio controlado.
+- Reloj sincronizado.
+- Logs persistentes, acotados y retenidos tres meses.
+- Alertas por correo cuando algo falla.
+- Respaldos diarios cifrados, locales y remotos, con prueba de restauración.
+- Correo del sistema reenviado a una dirección que alguien lee.
+- Inventario, diagrama y runbook fuera del servidor.
 
-- Actualizaciones aplicadas automáticamente con notificación y reinicio controlado.
-- Reloj sincronizado por `chrony` con pool regional.
-- Logs persistentes, acotados en tamaño y retenidos por tres meses.
-- Monitoreo básico que alerta por correo cuando algo va mal.
-- Respaldos diarios cifrados, locales y remotos, con prueba periódica de restauración.
-- Correo del sistema reenviado a una dirección externa que alguien lee.
-- Inventario, diagrama lógico y runbook básico registrados fuera del servidor.
-
-Con esta parte cerrada, el manual base llega a su fin. El servidor está desplegado, endurecido, mantenido y documentado en su capa genérica.
-
-A partir de aquí, cada manual que extiende esta base añade sus propias capas: servicios específicos del rol (mail, web, base de datos, Apache, WordPress), hardening complementario, runbooks operativos del rol, diagramas enriquecidos, y esquemas de respaldo extendidos. Lo que el manual base estableció — usuarios, SSH endurecido, firewall, fail2ban, sysctl, AppArmor, actualizaciones automáticas, sincronización de tiempo, logs, monitoreo básico, respaldos y MTA mínimo — sirve de cimiento para todos esos manuales y no se vuelve a documentar en cada uno: se hereda y se referencia.
-
-Dos partes de este manual no se ejecutan en el despliegue base y se alcanzan desde los manuales de rol, en el momento que cada uno indica. La §9.6 restringe los puertos web al proxy de borde y se aplica cuando el servicio ya responde a través de él. El Anexo C describe el firewall del proveedor de nube, que acompaña a UFW desde antes de instalar nada y se va abriendo a medida que el rol lo pide. Al terminar el despliegue base, lo correcto es que tanto UFW como el firewall del proveedor admitan solo el puerto de SSH.
+Con esto termina el manual base. Los manuales de rol (correo, web, bases de datos, aplicaciones) heredan y referencian esta base: usuarios, SSH, firewall, fail2ban, sysctl, AppArmor, actualizaciones, hora, logs, monitoreo, respaldos y correo saliente.
 
 ---
 
-## Anexos
+## Anexo A — Diagnóstico rápido post-incidente
 
-### Anexo A — Índice consolidado de plantillas
+Comandos agrupados por síntoma para formarse una imagen del sistema y descartar las causas comunes. Se asume acceso por SSH o consola con `sudo`; si SSH falla, se entra por la consola física o la del proveedor (22.3.3).
 
-Este manual usa plantillas alojadas en el repositorio público <https://github.com/noggalito/debian/tree/main/assets/13> que se descargan con `wget` y se sustituyen variables con `sed` durante la lectura. Esa estructura modular evita repetir bloques largos de configuración dentro del propio manual y facilita mantenerlas: si una plantilla cambia, basta con actualizarla en el repositorio sin tocar el documento.
-
-Este anexo concentra en un solo lugar la lista completa de plantillas referenciadas, su ruta de destino en el sistema, la sección del manual donde se aplican, y las variables que cada una requiere. Sirve como mapa rápido cuando se necesita recordar qué plantilla corresponde a qué archivo, especialmente útil al revisar un servidor desplegado tiempo atrás.
-
-#### A.1 Convenciones del sistema de plantillas
-
-Las plantillas están en el repositorio `https://github.com/noggalito/debian/`, bajo el directorio `assets/13/`. El nombre del archivo de plantilla refleja la ruta de destino con guiones en lugar de barras. Por ejemplo, `plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt` se despliega en `/etc/ssh/sshd_config.d/01-hardening.conf`.
-
-Las variables dentro de las plantillas usan el prefijo `$` y se sustituyen con `sed` antes de copiar al destino:
-
-```bash
-# Patrón general
-export MIVARIABLE=valor
-
-: "${ASSETS_BASE:?}" "${MIVARIABLE:?}" && \
-wget "${ASSETS_BASE}/<plantilla>.txt" -O /tmp/<plantilla>.txt && \
-sed -e "s|\$MIVARIABLE|${MIVARIABLE}|g" /tmp/<plantilla>.txt \
-    | sudo tee /<ruta-destino> > /dev/null
-
-# Comprobar que no quedó ningún marcador sin sustituir
-sudo grep -n '\$MI[A-Z_]*' /<ruta-destino> || echo "✓ plantilla aplicada"
-```
-
-Guarda, descarga y despliegue forman una sola orden encadenada con `&&`, y no líneas sueltas. El motivo son tres comportamientos comprobados de bash y wget, cada uno capaz de dejar un archivo de sistema vacío o a medio sustituir sin ningún error visible:
-
-- En una shell interactiva, un `${VAR:?}` que falla aborta solo la orden en curso. Si la guarda está en una línea aparte, el resto de un bloque pegado se ejecuta igual, con la variable vacía.
-- Si la guarda está dentro del `sed` de una tubería, el `sed` falla pero `sudo tee` se ejecuta de todos modos: deja el archivo de destino con 0 bytes y la orden termina con código 0.
-- `wget -O` crea el archivo de salida aunque la descarga falle (404, sin red, `ASSETS_BASE` mal escrito). Queda un archivo vacío que un `sed` o un `cp` posteriores instalarían sobre el destino.
-
-Con la cadena, cualquier fallo detiene la orden antes de tocar el destino. Las plantillas sin variables usan la misma cadena con `sudo cp` como último eslabón. Las guardas dentro de un heredoc sin comillas (`<<EOF`) sí son seguras por sí solas: si la expansión falla, `tee` no llega a ejecutarse.
-
-La comprobación final busca marcadores con el prefijo `$MI` que hayan quedado sin sustituir, síntoma de una variable nueva en la plantilla que el comando `sed` no contempla.
-
-Todas las plantillas del repositorio se mantienen con saltos de línea LF (Unix) gracias al archivo `.gitattributes` en la raíz del repositorio. Esto evita que un script descargado falle por shebang con CRLF si el repositorio fuera editado desde un sistema Windows.
-
-##### A.1.1 Modelo de seguridad: anclaje a commit SHA
-
-Las URLs que usan `refs/heads/main` apuntan a la punta de la rama, que es mutable: si el repositorio fuera comprometido, las instalaciones futuras recibirían contenido diferente sin saberlo. Para mitigar esto, el manual usa un commit SHA fijo (`SHA_COMMIT`) como referencia inmutable.
-
-**Configuración inicial (ejecutar una sola vez antes de la primera plantilla):**
-
-```bash
-# Obtener el SHA del commit que se desea anclar.
-# Opción A — si se tiene git instalado localmente:
-#   git ls-remote https://github.com/noggalito/debian/ HEAD | awk '{print $1}'
-# Opción B — consultar la página de commits en GitHub y copiar el SHA completo (40 caracteres)
-#   https://github.com/noggalito/debian/commits/main
-
-export SHA_COMMIT="<REEMPLAZAR-POR-SHA-DE-40-CARACTERES>"
-export ASSETS_BASE="https://raw.githubusercontent.com/noggalito/debian/${SHA_COMMIT}/assets/13"
-
-# Verificar que la variable quedó definida
-echo "SHA_COMMIT = ${SHA_COMMIT}"
-echo "ASSETS_BASE = ${ASSETS_BASE}"
-```
-
-#### A.2 Inventario de plantillas
-
-| Plantilla                                               | Versión | Sección | Ruta destino                               | Variables                                                                              |
-|---------------------------------------------------------|---------|---------|--------------------------------------------|----------------------------------------------------------------------------------------|
-| `plantilla-etc-hosts.txt`                               | v1.1    | 5.2     | `/etc/hosts`                               | `$MIHOST`, `$MIFQDN`                                                                   |
-| `plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt` | v1.1    | 8.1     | `/etc/ssh/sshd_config.d/01-hardening.conf` | `$MIPUERTO`, `$MIUSUARIO`                                                              |
-| `plantilla-etc-fail2ban-jail.local.txt`                 | v1.0    | 10.2    | `/etc/fail2ban/jail.local`                 | `$MIPUERTO`                                                                            |
-| `plantilla-etc-sysctl.d-99-hardening.conf.txt`          | v1.1    | 11.1    | `/etc/sysctl.d/99-hardening.conf`          | (sin variables)                                                                        |
-| `plantilla-etc-modprobe.d-99-hardening.conf.txt`        | v1.1    | 11.3    | `/etc/modprobe.d/99-hardening.conf`        | (sin variables)                                                                        |
-| `plantilla-etc-audit-rules.d-99-hardening.rules.txt`    | v1.1    | 12.1    | `/etc/audit/rules.d/99-hardening.rules`    | (sin variables)                                                                        |
-| `plantilla-etc-cron.hourly-server-check.txt`            | v1.1    | 17.2    | `/etc/cron.hourly/server-check`            | (sin variables)                                                                        |
-| `plantilla-etc-msmtprc.txt`                             | v1.1    | 19.4    | `/etc/msmtprc`                             | `$MIRELAY`, `$MIPUERTO_SMTP`, `$MIUSUARIO_SMTP`, `$MIFROM`                             |
-
-
-#### A.3 Resumen de variables del manual
-
-A lo largo del manual se usan variables de entorno para personalizar las plantillas. Las más comunes son:
-
-| Variable          | Significado                                                       | Ejemplo                                       |
-|-------------------|-------------------------------------------------------------------|-----------------------------------------------|
-| `$MIHOST`         | Hostname corto del servidor                                       | `villonaco`                                   |
-| `$MIFQDN`         | Nombre completo / FQDN del servidor                                     | `villonaco.ejemplo.com`                                   |
-| `$MIUSUARIO`      | Usuario administrativo                                            | `usuario`                                     |
-| `$MIPUERTO`       | Puerto SSH personalizado (también usado por fail2ban)             | `17177`                                       |
-| `$MIRELAY`        | Hostname del relay SMTP saliente                                  | `smtp.gmail.com`                              |
-| `$MIPUERTO_SMTP`  | Puerto SMTP del relay (sección 19 — distinto de `$MIPUERTO`)      | `587`                                         |
-| `$MIUSUARIO_SMTP` | Usuario para autenticarse contra el relay                         | `cuenta@dominio.com`                          |
-| `$MIFROM`         | Dirección "From" autorizada en el relay                           | `cuenta@dominio.com`                          |
-| `$MIDESTINO`      | Dirección externa donde llega el correo del sistema               | `admin@dominio.com`                           |
-| `$SHA_COMMIT`     | SHA del commit del repositorio de plantillas anclado              | `a1b2c3d4...` (40 chars)                      |
-| `$ASSETS_BASE`    | URL base para descarga de plantillas (derivada de `SHA_COMMIT`)   | `https://raw.githubusercontent.com/.../assets`|
-
-Conviene anotar los valores efectivos usados en este servidor concreto en el inventario del repositorio operativo (sección 20.1). Esto facilita reconstruir o auditar el servidor más adelante sin tener que adivinar qué se sustituyó en qué momento.
-
-#### A.4 Modificación local de plantillas
-
-Si se necesita un cambio que no admite ninguna de las variables existentes (por ejemplo, una directiva adicional de `sshd`), hay dos opciones razonables:
-
-Hacer un fork del repositorio y mantener una versión propia de la plantilla. Apropiado cuando los cambios son sostenidos en el tiempo y aplican a varios servidores de la organización. La URL de descarga apuntaría al fork en lugar del repositorio original.
-
-Editar el archivo destino tras desplegarlo. Apropiado cuando el cambio es específico de un servidor concreto. Anotar el cambio en el runbook (sección 20.3) para que sobreviva a redespliegues.
-
-No editar las plantillas en el repositorio original sin coordinación. Hacerlo afecta a todos los manuales y servidores futuros que dependan del mismo archivo.
-
-### Anexo B — Diagnóstico rápido post-incidente
-
-Cuando algo va mal — un servicio que no responde, una alerta que llega, una caída inesperada — el tiempo invertido en diagnosticar correctamente determina si el incidente se resuelve en minutos o en horas. Este anexo concentra los comandos más útiles agrupados por síntoma. No reemplaza un análisis profundo, pero sí permite levantar rápidamente una imagen del estado del sistema y descartar las causas más comunes.
-
-El anexo asume que el operador llegó al servidor por SSH (o consola) y tiene acceso `sudo`. Si SSH falla, el primer recurso es la consola física o del hypervisor / VPS, documentada en el runbook de la sección 20.3.3.
-
-#### B.1 Imagen general del sistema
-
-Cuando se recibe una alerta sin contexto claro o se sospecha que algo no anda bien, conviene empezar por una vista panorámica:
+### A.1 Imagen general del sistema
 
 ```bash
 # Estado general en una pantalla
@@ -4757,9 +4335,9 @@ last -a | head -10              # últimos logins
 sudo journalctl --since "1 hour ago" -p warning --no-pager | tail -50
 ```
 
-Si algo aquí salta a la vista (un servicio caído, disco al 100%, carga muy alta), el diagnóstico continúa por esa pista.
+Lo que salte a la vista (un servicio caído, un disco lleno, una carga alta) marca la pista.
 
-#### B.2 Síntoma: el servidor está lento o no responde
+### A.2 Síntoma: el servidor está lento o no responde
 
 ```bash
 # Carga y uso de CPU
@@ -4777,18 +4355,18 @@ vmstat 2 5                      # 5 muestras a 2 segundos
 sudo dmesg | tail -50           # mensajes del kernel recientes (OOM, errores de disco)
 ```
 
-`iotop` muestra qué proceso está haciendo I/O en tiempo real. Si el servidor está esperando al disco, es la herramienta clave. La columna `IO>` indica el porcentaje del tiempo que ese proceso está bloqueado por I/O.
+`iotop` muestra qué proceso hace E/S; su columna `IO>` es el porcentaje de tiempo que pasa bloqueado esperando al disco.
 
-#### B.3 Síntoma: un servicio no funciona
+### A.3 Síntoma: un servicio no funciona
 
 ```bash
-# Reemplazar <servicio> por el nombre real (ssh, chrony, fail2ban, etc.)
-sudo systemctl status <servicio> --no-pager
-sudo journalctl -u <servicio> -n 100 --no-pager
-sudo journalctl -u <servicio> --since "30 minutes ago" -p err
+export SERVICIO=ssh   # nombre real del servicio (ssh, chrony, fail2ban...)
+sudo systemctl status "${SERVICIO:?}" --no-pager
+sudo journalctl -u "${SERVICIO:?}" -n 100 --no-pager
+sudo journalctl -u "${SERVICIO:?}" --since "30 minutes ago" -p err
 
 # Verificar dependencias del servicio
-sudo systemctl list-dependencies <servicio>
+sudo systemctl list-dependencies "${SERVICIO:?}"
 
 # Verificar configuración antes de recargar (cuando aplique)
 sudo sshd -t                    # SSH
@@ -4796,9 +4374,9 @@ sudo nginx -t                   # nginx (si aplica)
 sudo postfix check              # postfix (si aplica)
 ```
 
-Si el servicio falló al arrancar, `journalctl -u <servicio>` muestra el motivo. Errores comunes: archivo de configuración con sintaxis inválida tras una edición reciente, puerto ocupado por otro proceso, falta de permisos en algún archivo del que depende.
+`journalctl -u` da el motivo. Lo habitual: sintaxis rota tras una edición, puerto ocupado o permisos.
 
-#### B.4 Síntoma: el disco está lleno
+### A.4 Síntoma: el disco está lleno
 
 ```bash
 # Uso por filesystem
@@ -4820,25 +4398,26 @@ sudo find /tmp -type f -size +100M -exec ls -lh {} \;
 sudo journalctl --disk-usage
 ```
 
-Causas frecuentes: logs sin rotar (logrotate falló), `/var/log/sudo-io/` sin regla de retención (16.2.1), un proceso que escribe sin parar a un archivo (revisar `/var/log` y `/tmp`), un dump de base de datos olvidado, un respaldo a medio hacer. Si journald está consumiendo demasiado, ajustar `SystemMaxUse` en `/etc/systemd/journald.conf` (sección 16.1.1) y ejecutar `sudo journalctl --vacuum-time=7d` para forzar la limpieza inmediata.
+Logs sin rotar, `/var/log/sudo-io/` sin retención (18.2.1), un proceso que escribe sin parar en `/var/log` o `/tmp`, un volcado olvidado o un respaldo a medias. Si es el journal, se baja `SystemMaxUse` en el drop-in de 18.1.1 y se libera en el momento con `sudo journalctl --vacuum-time=7d`.
 
-#### B.5 Síntoma: no puedo conectar por SSH
+### A.5 Síntoma: no puedo conectar por SSH
 
-Esto se diagnostica desde otra máquina si SSH no funciona, o desde la consola física / hypervisor si nada responde.
+Desde otra máquina, con las variables de 10.2:
 
 ```bash
 # Desde otra máquina, contra el servidor
-ping <ip-del-servidor>
-nc -vz <ip-del-servidor> <puerto-ssh>
+MIFQDN=villonaco.ejemplo.com   # nombre DNS del servidor, si se usa
+ping -c 3 "${IP_SERVIDOR:?}"
+nc -vz "${IP_SERVIDOR:?}" "${MIPUERTO:?}"
 
-# Resolución DNS si se usa hostname
-dig +short <hostname>
+# Resolución DNS si se usa el nombre
+getent hosts "${MIFQDN:?}"
 
 # Prueba SSH con verbose
-ssh -vvv -p <puerto> <usuario>@<ip>
+ssh -vvv -p "${MIPUERTO:?}" "${MIUSUARIO:?}@${IP_SERVIDOR:?}"
 ```
 
-Una vez en consola, en el servidor:
+Desde la consola del servidor:
 
 ```bash
 # ¿Está SSH escuchando?
@@ -4851,16 +4430,17 @@ sudo ufw status verbose
 
 # ¿fail2ban baneó la IP?
 sudo fail2ban-client status sshd
-sudo fail2ban-client set sshd unbanip <ip-del-administrador>
+IP_ADMIN=198.51.100.7   # IP pública del equipo del administrador
+sudo fail2ban-client set sshd unbanip "${IP_ADMIN:?}"
 
 # Logs de SSH
 sudo journalctl -u ssh -n 50
 sudo journalctl -u ssh --since "30 minutes ago" | grep -iE 'fail|invalid|preauth'
 ```
 
-Causas frecuentes: cambio reciente en `sshd_config.d/01-hardening.conf` que rompe la sintaxis (verificar siempre con `sudo sshd -t` antes de recargar), regla de UFW eliminada por error, IP del administrador baneada por fail2ban tras varios fallos legítimos, puerto cambiado y olvidado actualizar el `~/.ssh/config` del cliente.
+Lo habitual: un `01-hardening.conf` con sintaxis rota (`sudo sshd -t` antes de recargar), una regla de UFW borrada, la IP propia baneada por fail2ban o un puerto cambiado sin actualizar `~/.ssh/config`. `Too many authentication failures` sin haber escrito contraseña es un cliente que ofrece otras llaves y agota `MaxAuthTries`: falta `IdentitiesOnly yes` (10.4).
 
-#### B.6 Síntoma: red sin conectividad
+### A.6 Síntoma: red sin conectividad
 
 ```bash
 # Interfaces e IPs
@@ -4869,10 +4449,10 @@ ip route
 cat /etc/resolv.conf
 
 # Conectividad por capas
-ping 127.0.0.1                  # capa loopback
-ping <ip-del-gateway>           # capa enlace
-ping 1.1.1.1                    # capa IP externa
-ping deb.debian.org             # capa IP + DNS
+ping -c 3 127.0.0.1                                              # capa loopback
+ping -c 3 "$(ip route show default | awk '{print $3; exit}')"    # capa enlace (gateway)
+ping -c 3 1.1.1.1                                                # capa IP externa
+ping -c 3 deb.debian.org                                         # capa IP + DNS
 
 # Estado del backend de red activo
 sudo systemctl status systemd-networkd --no-pager   # si se usa networkd
@@ -4883,9 +4463,9 @@ sudo systemctl status dhcpcd --no-pager             # si se usa dhcpcd
 sudo ss -tunap | head -30
 ```
 
-Si los pings a IPs externas funcionan pero los pings a hostnames no, el problema es DNS. Si el ping al gateway falla, es problema de capa enlace o de configuración de la interfaz.
+Si responden las IP externas y no los nombres, es DNS; si no responde el gateway, es el enlace o la interfaz.
 
-#### B.7 Síntoma: alerta de fail2ban con muchas IPs baneadas
+### A.7 Síntoma: alerta de fail2ban con muchas IPs baneadas
 
 ```bash
 # Estado general
@@ -4902,11 +4482,9 @@ sudo journalctl -u fail2ban -n 100 --no-pager
 sudo journalctl -u fail2ban --since "1 hour ago" | grep -i ban
 ```
 
-Una cantidad alta de bans no es necesariamente alarmante: SSH expuesto al internet recibe escaneos automatizados constantemente. Pero si el patrón cambia (de pronto cientos de bans nuevos por hora) puede indicar un ataque dirigido. Revisar también los logs del kernel por si hay flood SYN: `sudo dmesg | grep -i 'syn flood'`.
+Muchos baneos no alarman por sí solos: un SSH expuesto recibe escaneos constantes. Un cambio brusco, como cientos por hora, puede ser un ataque dirigido; se revisa también `sudo dmesg | grep -i 'syn flood'`.
 
-#### B.8 Síntoma: el sistema no arrancó del todo
-
-Aplica cuando el servidor reinició y algunos servicios no levantaron:
+### A.8 Síntoma: el sistema no arrancó del todo
 
 ```bash
 # Servicios que fallaron en este arranque
@@ -4926,17 +4504,18 @@ sudo journalctl -b -p err --no-pager
 sudo journalctl -b -1 -p err --no-pager
 ```
 
-Si AppArmor, AIDE o auditd reportan diferencias o denegaciones tras el arranque, revisarlos con sus comandos específicos:
+Si AppArmor, AIDE o auditd señalan algo tras el arranque:
 
 ```bash
 sudo aa-status
 sudo aide --config /etc/aide/aide.conf --check
-sudo journalctl -k | grep -iE 'apparmor.*denied' | tail -20
+sudo grep -h 'apparmor="DENIED"' /var/log/audit/audit.log* | tail -20   # con auditd activo (15.3)
+sudo journalctl -k | grep 'apparmor="DENIED"' | tail -20                # sin auditd
 ```
 
-#### B.9 Recolección de evidencia para análisis posterior
+### A.9 Recolección de evidencia para análisis posterior
 
-Cuando el incidente requiere análisis profundo (forense, soporte externo, post-mortem), conviene capturar el estado actual antes de tocar nada:
+Antes de tocar nada, cuando hará falta análisis forense, soporte externo o post-mortem:
 
 ```bash
 # Crear directorio temporal con marca de tiempo
@@ -4967,328 +4546,56 @@ sudo tar czf "incident-$(date +%Y%m%dT%H%M%S).tar.gz" "$(basename $INCIDENT_DIR)
 ls -la *.tar.gz
 ```
 
-Este paquete comprimido se copia fuera del servidor (a la estación del administrador, a un servidor de evidencia, a un sistema de tickets) antes de seguir investigando o aplicar correcciones. Una vez que se modifica el estado del sistema, la evidencia inicial se pierde.
-
-Para casos donde se sospecha compromiso, la regla de oro es no apagar el servidor todavía (se pierden procesos en RAM, conexiones activas, archivos en `/tmp` que algunos rootkits limpian al reiniciar). Aislar de la red sí — desconectando o cambiando la regla de UFW por `sudo ufw default deny outgoing` temporalmente — pero sin reiniciar hasta haber capturado la evidencia volátil.
-
-#### B.10 Cuándo escalar
-
-Si tras estas verificaciones no se identifica la causa, o el incidente excede la capacidad del operador único, los pasos típicos son: levantar un ticket en el sistema de la organización, contactar al equipo de seguridad si se sospecha compromiso, y dejar el servidor en un estado controlado (servicios críticos detenidos si causan más daño que beneficio, red aislada si se sospecha compromiso) mientras llega ayuda.
-
-El runbook (sección 20.3) debe documentar a quién escalar y por qué canal, antes de que el incidente ocurra. Un incidente real no es momento de descubrir que nadie tiene el teléfono del responsable de seguridad.
-
-#### B.11 Síntoma: volumen anómalo de peticiones en un servicio web
-
-Se manifiesta como lentitud intermitente, picos de carga sin causa aparente, o simplemente como un log de acceso que crece más rápido de lo normal. El objetivo de este apartado es responder tres preguntas sobre un log de acceso en formato JSON, que es el que producen la mayoría de proxies inversos modernos: qué proporción del tráfico es real, de dónde viene lo que no lo es, y si hay una ruta concreta bajo presión.
-
-El conteo por código de estado da la primera imagen. Una proporción alta de `404` indica rastreo automatizado; una de `0` o `502` indica que el backend dejó de responder.
-
-```bash
-sudo tail -n 5000 /var/log/<servicio>/access.log | python3 -c "
-import sys, json, collections
-c = collections.Counter()
-for l in sys.stdin:
-    c[json.loads(l)['status']] += 1
-print(dict(sorted(c.items())))"
-```
-
-La agrupación por bloque `/24` revela si el volumen viene de un rango concreto, que es lo habitual en el rastreo automatizado y lo que distingue a un escáner de un ataque distribuido.
-
-```bash
-sudo tail -n 5000 /var/log/<servicio>/access.log | python3 -c "
-import sys, json, collections
-c = collections.Counter()
-for l in sys.stdin:
-    ip = json.loads(l)['request']['client_ip']
-    c['.'.join(ip.split('.')[:3]) + '.0/24'] += 1
-for k, n in c.most_common(10):
-    print(f'{n:7d}  {k}')"
-```
-
-Las rutas más pedidas dentro de los `404` dicen qué se está buscando. Nombres de gestores de contenido ajenos, archivos de configuración o rutas con `..` codificado son rastreo de vulnerabilidades y no requieren más que bloqueo en el proxy.
-
-```bash
-sudo tail -n 5000 /var/log/<servicio>/access.log | python3 -c "
-import sys, json, collections
-c = collections.Counter()
-for l in sys.stdin:
-    d = json.loads(l)
-    if d['status'] == 404:
-        c[d['request']['uri'].split('?')[0][:60]] += 1
-for u, n in c.most_common(15):
-    print(f'{n:5d}  {u}')"
-```
-
-Para distinguir un ataque distribuido de un escáner único, las dos medidas que importan son el ritmo agregado y la dispersión de orígenes. Un escáner produce muchas peticiones por minuto desde pocas direcciones; una campaña distribuida produce un ritmo agregado moderado desde decenas o cientos de direcciones por hora.
-
-```bash
-sudo tail -n 20000 /var/log/<servicio>/access.log | python3 -c "
-import sys, json, collections, statistics
-porminuto = collections.Counter()
-porhora = collections.defaultdict(set)
-for l in sys.stdin:
-    d = json.loads(l)
-    t = d['ts']
-    porminuto[int(t // 60)] += 1
-    porhora[int(t // 3600)].add(d['request']['client_ip'])
-print('peticiones/min  mediana:', statistics.median(porminuto.values()), ' máx:', max(porminuto.values()))
-print('IPs distintas/hora  mediana:', statistics.median(len(v) for v in porhora.values()))"
-```
-
-**Interpretación.** Si el ritmo por minuto es alto y las direcciones distintas por hora son pocas, es un escáner y fail2ban o un bloqueo por origen lo resuelven. Si el ritmo por minuto es moderado pero las direcciones distintas por hora se cuentan por decenas, el baneo por IP no va a servir y hay que mirar la §10.5.
-
-> Estos comandos leen la cola del archivo activo. Si el incidente es de días atrás, hay que descomprimir primero los archivos rotados, y conviene revisar la §16.5 antes de dar por hecho que siguen ahí.
-
-### Anexo C — Firewall del proveedor de nube
-
-En un servidor en la nube hay dos firewalls en serie. El del proveedor actúa en su red, antes de que el paquete llegue a la máquina; UFW actúa dentro de ella. La sección 9 configura el segundo. Este anexo se ocupa del primero, que el manual base no puede configurar por el lector porque depende del proveedor, pero que condiciona todo lo demás: un puerto abierto en UFW y cerrado en el proveedor no recibe nada, y uno cerrado en UFW y abierto en el proveedor puede seguir expuesto si lo publica un contenedor.
-
-Aplica a cualquier servidor con un firewall gestionado delante: los grupos de seguridad de red de Azure, los grupos de seguridad de AWS, los firewalls de nube de Hetzner o DigitalOcean, el firewall de VPS de Hostinger, las listas de seguridad de Oracle. En un servidor físico o en una VM sin esa capa no hay nada que configurar aquí, y C.1 explica qué se pierde.
-
-#### C.1 Dos firewalls, dos alcances
-
-Los dos se mantienen, y con las mismas reglas. No es redundancia gratuita: cada uno cubre un fallo del otro.
-
-El firewall del proveedor filtra antes de que el tráfico consuma nada del servidor, sobrevive a un error de configuración dentro de la máquina y es el único de los dos que alcanza a los puertos publicados por contenedores. El demonio de contenedores inserta sus reglas en cadenas que UFW no gobierna, de modo que una regla de UFW sobre un puerto publicado por un contenedor ni lo abre ni lo cierra.
-
-UFW protege frente a lo que el proveedor no ve: las otras máquinas de la misma red virtual, que el proveedor suele permitir entre sí por defecto, y un grupo de seguridad que alguien deje abierto por error desde el panel. Además vive en el servidor, se respalda con `/etc` y se audita con las mismas herramientas que el resto del manual.
-
-> En un servidor sin firewall de proveedor, los puertos publicados por contenedores quedan expuestos a todo lo que alcance la máquina, diga lo que diga UFW. La salida es filtrar en la cadena que el propio demonio consulta antes que las suyas, y no está documentada en este manual porque no se ha verificado en los entornos del corpus. Queda anotada en el To-do. Mientras tanto, la regla práctica es no publicar puertos de contenedores en un servidor que no tenga esa capa delante.
-
-#### C.2 Reglas según el momento del despliegue
-
-El firewall del proveedor deniega por defecto todo lo entrante, igual que UFW, y se abre en el mismo orden y con el mismo criterio. Lo que cambia a lo largo del despliegue es poco:
-
-| Momento | Reglas de entrada | Dónde se decide |
-|---|---|---|
-| Despliegue base, este manual | Solo SSH en el puerto de la sección 8 | Sección 9.3 |
-| Servicio web publicado directamente | SSH, más 80 y 443 desde cualquier origen | Manual del proxy inverso |
-| Servicio web detrás de un borde | SSH, más 443 solo desde los rangos del borde | Sección 9.6 |
-
-Tres criterios valen para cualquier proveedor.
-
-Se parte de lo que ya exista y se borra lo que sobre. Las máquinas creadas desde un asistente suelen traer una regla que abre el puerto 22 a cualquier origen. Con SSH movido de puerto según la sección 8, esa regla no protege nada y deja declarado un puerto en el que no escucha nadie; se sustituye por la del puerto real.
-
-Las reglas temporales se anotan en el momento de crearlas. Un puerto de aplicación abierto un momento para una prueba es el origen más habitual de una exposición que nadie recuerda. Si hace falta, se limita a la dirección del administrador y se borra en la misma sesión.
-
-El puerto de SSH se restringe a la dirección del administrador solo si esa dirección es estable. Con una dirección que cambia, la restricción acaba cortando el acceso en el peor momento, y la protección real de SSH ya la dan la autenticación por llave de la sección 8 y fail2ban de la sección 10.
-
-#### C.3 Azure: grupo de seguridad de red
-
-En Azure el firewall del proveedor es el grupo de seguridad de red, NSG por sus siglas en inglés. Puede haber uno asociado a la interfaz de la máquina y otro a la subred, y el tráfico tiene que pasar los dos. Las reglas se evalúan por prioridad, de menor a mayor número, y la lista termina con una regla implícita que deniega todo lo entrante que no venga de la propia red virtual o del balanceador de Azure.
-
-Las órdenes se ejecutan desde la estación de trabajo y no desde el servidor. Una sesión de `az` iniciada en la máquina es una credencial con poder sobre toda la suscripción, al alcance de quien la comprometa.
-
-```bash
-az login
-export RG=<grupo-de-recursos>
-az network nsg list -g "${RG:?}" -o table
-
-export NSG=<nombre-del-nsg>
-az network nsg rule list -g "${RG:?}" --nsg-name "${NSG:?}" -o table
-```
-
-La última orden muestra las reglas propias. Con `--include-default` añade las implícitas, que conviene ver una vez para saber qué se permite sin haberlo pedido.
-
-**SSH.** Con la dirección del administrador fija:
-
-```bash
-export MIPUERTO=17177                           # definido en 8.1
-export MI_IP=$(curl -s https://api.ipify.org)
-
-az network nsg rule create -g "${RG:?}" --nsg-name "${NSG:?}" -n SSH-admin \
-  --priority 100 --direction Inbound --access Allow --protocol Tcp \
-  --source-address-prefixes "${MI_IP:?}" --destination-port-ranges "${MIPUERTO:?}"
-```
-
-Con una dirección que cambia, se omite `--source-address-prefixes` y la regla admite cualquier origen, según el tercer criterio de C.2.
-
-**Servicio web publicado directamente.**
-
-```bash
-az network nsg rule create -g "${RG:?}" --nsg-name "${NSG:?}" -n Web-publico \
-  --priority 200 --direction Inbound --access Allow --protocol Tcp \
-  --destination-port-ranges 80 443
-```
-
-**Servicio web detrás de un borde.** Las listas se descargan en la estación, con la misma comprobación de 9.6 antes de usarlas, y van en dos reglas, una por familia de direcciones:
-
-```bash
-rm -f /tmp/rangos-v4.txt /tmp/rangos-v6.txt
-curl -fsS "https://<proveedor>/ips-v4" -o /tmp/rangos-v4.txt
-curl -fsS "https://<proveedor>/ips-v6" -o /tmp/rangos-v6.txt
-cat /tmp/rangos-v4.txt; echo; cat /tmp/rangos-v6.txt; echo
-
-az network nsg rule create -g "${RG:?}" --nsg-name "${NSG:?}" -n Web-borde-v4 \
-  --priority 200 --direction Inbound --access Allow --protocol Tcp \
-  --source-address-prefixes $(cat /tmp/rangos-v4.txt) --destination-port-ranges 443
-
-az network nsg rule create -g "${RG:?}" --nsg-name "${NSG:?}" -n Web-borde-v6 \
-  --priority 210 --direction Inbound --access Allow --protocol Tcp \
-  --source-address-prefixes $(cat /tmp/rangos-v6.txt) --destination-port-ranges 443
-```
-
-Si una descarga falla, el archivo queda vacío, la orden se queda sin valores para `--source-address-prefixes` y `az` la rechaza sin crear nada. La regla de IPv6 solo surte efecto si la máquina tiene una dirección IPv6 pública; crearla sin tenerla no hace daño y evita olvidarla el día que se asigne. Si el borde también llega al origen por HTTP, el puerto 80 se añade a `--destination-port-ranges`, con el mismo criterio que `PUERTOS_BORDE` en 9.6.
-
-**Retiro de lo que sobra.** Primero se crean las reglas restringidas y después se borran las abiertas, igual que en 9.6. Los candidatos habituales son la regla del puerto 22 que dejó el asistente, una regla de 80 y 443 desde cualquier origen cuando ya hay un borde, y cualquier puerto de aplicación abierto para una prueba.
-
-```bash
-az network nsg rule list -g "${RG:?}" --nsg-name "${NSG:?}" -o table
-az network nsg rule delete -g "${RG:?}" --nsg-name "${NSG:?}" -n <nombre-de-la-regla>
-```
-
-**Los dos niveles.** Si después de todo lo anterior un puerto sigue sin responder, o sigue respondiendo, lo que se está viendo es el efecto combinado del NSG de la interfaz y el de la subred:
-
-```bash
-az network nic list -g "${RG:?}" -o table
-az network nic list-effective-nsg -g "${RG:?}" -n <nombre-de-la-interfaz>
-```
-
-Desde el portal, las mismas reglas están en la máquina virtual, en el apartado de redes, como reglas de puerto de entrada. Los paneles cambian de sitio y de nombre; el concepto es el de este anexo.
-
-> Estas órdenes están tomadas de la referencia de la CLI de Azure y no de una corrida completa en los entornos del corpus. Está anotado en el To-do. Antes de borrar ninguna regla, comprueba con C.5 que las nuevas hacen lo que se espera.
-
-#### C.4 Hostinger: firewall del VPS
-
-En Hostinger el firewall del proveedor es un grupo de reglas que se crea en el panel y se activa sobre el VPS. Una máquina solo puede tener un grupo activo. El grupo descarta todo lo entrante que no tenga una regla que lo acepte, y alcanza a los puertos publicados por contenedores: con él activo dejan de responder desde fuera, que es lo que C.5 comprueba.
-
-Dos particularidades condicionan el procedimiento. Las reglas no admiten una lista de orígenes, de modo que restringir un puerto a los rangos de un borde son tantas reglas como rangos. Y un cambio en las reglas no llega a la máquina hasta que el grupo se sincroniza: mientras tanto el listado muestra la regla nueva y el VPS sigue filtrando con las anteriores.
-
-El grupo y la regla de SSH se crean desde el panel en el despliegue base, en el apartado de seguridad del VPS. La regla de SSH se añade antes de activar el grupo sobre la máquina, porque un grupo activo sin esa regla corta también el acceso de administración.
-
-Para las reglas del borde se usa la API, que evita crear una regla por rango a mano. Las órdenes se ejecutan desde la estación de trabajo y no desde el servidor, por la misma razón que en C.3: el token es una credencial de la cuenta del proveedor. Se genera en el apartado de API del panel, con la caducidad más corta que ofrezca, y se revoca al terminar.
-
-```bash
-read -rsp "Token de la API de Hostinger: " HAPI; echo
-export API=https://developers.hostinger.com/api/vps/v1
-hapi() { printf 'Authorization: Bearer %s\n' "${HAPI:?}" | curl -sS -H @- -H 'Content-Type: application/json' "$@"; }
-```
-
-El token se lee sin eco y llega a `curl` por la entrada estándar, de modo que no queda en el historial de la shell ni en la lista de procesos.
-
-```bash
-hapi "${API:?}/firewall" | python3 -m json.tool
-
-export FW=<id-del-grupo>
-hapi "${API:?}/firewall/${FW:?}" | python3 -m json.tool
-```
-
-La primera orden lista los grupos de la cuenta con su `id`. La segunda muestra las reglas del elegido, y entre ellas tiene que estar la de SSH:
-
-```
-{
-    "id": 1391065,
-    "action": "accept",
-    "protocol": "TCP",
-    "port": "17177",
-    "source": "any",
-    "source_detail": "any"
-}
-```
-
-Si la lista de grupos sale vacía o la regla de SSH no aparece, no se continúa. Lo que filtra delante de la máquina no es lo que se cree, y conviene averiguarlo antes de tocar nada.
-
-Servicio web detrás de un borde. Las listas se descargan en la estación, con la misma comprobación de 9.6 antes de usarlas, y se crea una regla por rango:
-
-```bash
-rm -f /tmp/rangos-v4.txt /tmp/rangos-v6.txt
-curl -fsS "https://<proveedor>/ips-v4" -o /tmp/rangos-v4.txt
-curl -fsS "https://<proveedor>/ips-v6" -o /tmp/rangos-v6.txt
-{ cat /tmp/rangos-v4.txt; echo; cat /tmp/rangos-v6.txt; echo; } | grep -v '^$' > /tmp/rangos-borde.txt
-wc -l < /tmp/rangos-borde.txt
-
-for R in $(cat /tmp/rangos-borde.txt); do
-  printf '%-22s ' "${R}"
-  hapi -o /dev/null -w '%{http_code}\n' -X POST "${API:?}/firewall/${FW:?}/rules" \
-    -d "{\"protocol\":\"TCP\",\"port\":\"443\",\"source\":\"custom\",\"source_detail\":\"${R}\"}"
-  sleep 1
-done
-```
-
-El recuento de `wc` debe coincidir con el número de rangos aplicado en UFW, que en el servidor es el número de líneas de `${RANGOS_ARCHIVO}`. Cada línea del bucle debe terminar en `200`, tanto para los rangos IPv4 como para los IPv6. Si la descarga falló, el archivo queda vacío y el bucle no crea nada. Si el borde también llega al origen por HTTP, el bucle se repite con el puerto 80, con el mismo criterio que `PUERTOS_BORDE` en 9.6.
-
-Las reglas creadas todavía no filtran. Se sincroniza el grupo y se comprueba el resultado:
-
-```bash
-hapi -X POST "${API:?}/firewall/${FW:?}/sync" | python3 -m json.tool
-
-hapi "${API:?}/firewall/${FW:?}" | python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-print('sincronizado:', d.get('is_synced'))
-for r in d.get('rules', []):
-    print(r['id'], r['action'], r['protocol'], r['port'], r['source_detail'])"
-
-unset HAPI
-```
-
-La sincronización responde `Request accepted` y se aplica en segundo plano. El listado debe mostrar `sincronizado: True`, la regla de SSH y una regla del 443 por rango; si todavía dice `False`, se repite al cabo de unos segundos. Después se revoca el token en el panel, porque el `unset` solo lo borra de la terminal, y se comprueba que el acceso por SSH sigue funcionando.
-
-SSH y servicio web publicado directamente. Se crean con la misma orden, cambiando el puerto y con el origen abierto, que en la API se escribe como aparece en el listado la regla de SSH creada desde el panel:
-
-```bash
-export MIPUERTO=17177                           # definido en 8.1
-
-hapi -o /dev/null -w '%{http_code}\n' -X POST "${API:?}/firewall/${FW:?}/rules" \
-  -d "{\"protocol\":\"TCP\",\"port\":\"${MIPUERTO:?}\",\"source\":\"any\",\"source_detail\":\"any\"}"
-```
-
-Retiro de lo que sobra. Primero se crean y se sincronizan las reglas restringidas y después se borran las abiertas, igual que en 9.6. Cada regla se borra por el identificador que muestra el listado, y el borrado tampoco surte efecto hasta sincronizar:
-
-```bash
-hapi -o /dev/null -w '%{http_code}\n' -X DELETE "${API:?}/firewall/${FW:?}/rules/<id-de-la-regla>"
-hapi -X POST "${API:?}/firewall/${FW:?}/sync" | python3 -m json.tool
-```
-
-> La API tiene además una operación que sustituye todas las reglas del grupo de una vez, con `PUT` sobre la misma ruta de las reglas. Sustituye el conjunto entero: si la lista enviada no incluye la regla de SSH, el acceso de administración se pierde en la siguiente sincronización. No se usa en este manual.
-
-> De esta subsección están verificados en un entorno del corpus el listado, el alta de reglas por rango y la sincronización. El alta con origen abierto y el borrado están tomados de la referencia de la API y no de una corrida; está anotado en el To-do. Antes de borrar ninguna regla, comprueba con C.5 que las nuevas hacen lo que se espera.
-
-#### C.5 Verificación desde fuera
-
-Se hace desde una máquina que no sea el servidor, y conviene repetirla después de cada cambio de reglas, aquí o en UFW.
-
-```bash
-nc -zv -w 5 <ip-publica> <puerto-ssh>                # debe conectar
-nc -zv -w 5 <ip-publica> 22                          # debe agotar el tiempo
-nc -zv -w 5 <ip-publica> 443                         # según la fila de C.2 que aplique
-nc -zv -w 5 <ip-publica> <puerto-de-un-contenedor>   # debe agotar el tiempo
-```
-
-La respuesta distingue tres situaciones. Si conecta, el puerto está abierto en los dos firewalls y hay un servicio escuchando. Si agota el tiempo, alguno de los dos descarta los paquetes, que es lo deseado en todo puerto que no deba ser público. Si devuelve `connection refused`, los paquetes llegan a la máquina y no hay servicio escuchando: el camino de red está abierto aunque hoy no responda nadie, y el día que algo escuche en ese puerto quedará expuesto.
-
-Con el servicio detrás de un borde, la prueba del 443 debe agotar el tiempo desde cualquier máquina que no pertenezca al borde. Y la última prueba es la que importa en un servidor con contenedores: un puerto publicado por un contenedor que conecta desde fuera está expuesto, diga lo que diga `ufw status`.
-
-#### C.6 Mantenimiento
-
-Las reglas del proveedor no se respaldan con el servidor ni aparecen en ninguno de sus registros, así que su documentación es el inventario de 20.1 y el diagrama de 20.2. Cada regla tiene que poder explicarse con una fila de C.2; la que no, se borra.
-
-En la revisión mensual, junto con la comprobación de rangos de 9.6:
-
-```bash
-az network nsg rule list -g "${RG:?}" --nsg-name "${NSG:?}" -o table
-```
-
-Cuando la lista del borde cambia, se actualizan las reglas existentes en lugar de crear otras, en la misma sesión en que se actualiza UFW:
-
-```bash
-az network nsg rule update -g "${RG:?}" --nsg-name "${NSG:?}" -n Web-borde-v4 \
-  --source-address-prefixes $(cat /tmp/rangos-v4.txt)
-
-az network nsg rule update -g "${RG:?}" --nsg-name "${NSG:?}" -n Web-borde-v6 \
-  --source-address-prefixes $(cat /tmp/rangos-v6.txt)
-```
-
-Y cuando cambia la dirección del administrador, la de SSH:
-
-```bash
-az network nsg rule update -g "${RG:?}" --nsg-name "${NSG:?}" -n SSH-admin \
-  --source-address-prefixes "$(curl -s https://api.ipify.org)"
-```
-
-> Si la dirección cambió y ya no se puede entrar por SSH, esta última orden es la vía de recuperación, y funciona porque se ejecuta desde la estación contra la API del proveedor y no contra el servidor. Es una razón más para no guardar la sesión de `az` en la máquina que se administra.
-
-En Hostinger, la revisión mensual es el listado de C.4, que además dice si el grupo quedó sin sincronizar después de algún cambio hecho desde el panel. Cuando la lista del borde cambia no hay regla que actualizar, porque cada rango es una regla: los rangos nuevos se dan de alta con el bucle de C.4 sobre un archivo que contenga solo esos, se sincroniza, y al final se borran por su identificador las reglas de los rangos retirados y se sincroniza otra vez.
+El paquete se copia fuera del servidor antes de investigar o corregir, porque cualquier cambio destruye la evidencia inicial. Ante sospecha de compromiso no se apaga el servidor, que perdería procesos, conexiones y lo que haya en `/tmp`: se aísla de la red (por ejemplo con `sudo ufw default deny outgoing`) y se captura primero lo volátil.
+
+### A.10 Cuándo escalar
+
+Si no se encuentra la causa o el incidente supera al operador: ticket en la organización, aviso al equipo de seguridad si se sospecha compromiso, y el servidor en estado controlado (servicios dañinos detenidos, red aislada) mientras llega ayuda. A quién se escala y por qué canal lo dice el runbook (22.3), escrito antes del incidente.
+
+## Referencias
+
+Ante una discrepancia, manda la página `man` del paquete instalado, que describe exactamente esa versión; la web del proyecto suele describir la última publicada.
+
+### Documentación de Debian
+
+- [Verificación de imágenes](https://www.debian.org/CD/verify), base de la sección 1.
+- [Noticias del proyecto](https://www.debian.org/News/), donde se anuncian los point releases (16.9).
+- [Debian Reference](https://www.debian.org/doc/user-manuals#quick-reference), empaquetada como `debian-reference-es` y `debian-reference-en`.
+- [The Debian Administrator's Handbook](https://debian-handbook.info), empaquetado como `debian-handbook`.
+
+### Componentes del manual
+
+| Componente | Secciones | Páginas `man` | Proyecto |
+|---|---|---|---|
+| OpenSSH | 6, 10 | `sshd_config(5)`, `ssh_config(5)` | <https://www.openssh.com/> |
+| sudo | 4, 9.3 | `sudoers(5)` | <https://www.sudo.ws/> |
+| Linux-PAM, faillock | 9.3 | `pam_faillock(8)`, `faillock.conf(5)`, `pam-auth-update(8)`, `login.defs(5)` | <http://www.linux-pam.org/> |
+| libpwquality | 9.4 | `pwquality.conf(5)` | <https://github.com/libpwquality/libpwquality> |
+| UFW | 11 | `ufw(8)` | <https://launchpad.net/ufw> |
+| fail2ban | 12 | `jail.conf(5)` | <https://www.fail2ban.org> |
+| Kernel y módulos | 13 | `sysctl.d(5)`, `modprobe.d(5)` | — |
+| systemd-resolved | 13.4 | `resolved.conf(5)` | <https://systemd.io> |
+| auditd | 14.1 | `auditd.conf(5)`, `audit.rules(7)`, `auditctl(8)`, `augenrules(8)` | <https://people.redhat.com/sgrubb/audit/> |
+| debsums | 14.2 | `debsums(1)` | — |
+| AIDE | 14.3 | `aide(1)`, `aide.conf(5)` | <https://aide.github.io> |
+| wtmpdb | 14.4 | `wtmpdb(8)` | <https://github.com/thkukuk/wtmpdb/> |
+| Lynis | 14.5 | `lynis(8)` | <https://cisofy.com/lynis/> |
+| AppArmor | 15 | `apparmor(7)`, `aa-status(8)`, `apparmor_parser(8)` | <https://apparmor.net/> |
+| unattended-upgrades | 16 | `unattended-upgrade(8)` | — |
+| apt-listchanges | 16 | `apt-listchanges(1)` | <https://salsa.debian.org/debian/apt-listchanges/> |
+| chrony | 17 | `chrony.conf(5)`, `chronyc(1)` | <https://chrony-project.org> |
+| systemd-journald | 18 | `journald.conf(5)`, `journalctl(1)`, `tmpfiles.d(5)` | <https://systemd.io> |
+| logrotate | 18, 21.13 | `logrotate(8)` | <https://github.com/logrotate/logrotate> |
+| sysstat | 19 | `sar(1)` | <https://sysstat.github.io/> |
+| cron y run-parts | 19 | `crontab(5)`, `run-parts(8)`, `systemd.timer(5)` | — |
+| BorgBackup | 20 | `borg(1)` | <https://borgbackup.github.io/borgbackup/> |
+| msmtp | 21 | `msmtp(1)` | <https://marlam.de/msmtp/> |
+| GNU Mailutils | 21 | `mail(1)` | <https://www.gnu.org/software/mailutils/> |
+| cryptsetup | 2 | `cryptsetup(8)` | <https://gitlab.com/cryptsetup/cryptsetup> |
+| needrestart | 8.4 | — | <https://github.com/liske/needrestart> |
+| Red | 7.5 | `interfaces(5)`, `systemd.network(5)` | — |
+
+Las direcciones son las del campo `Homepage` de cada paquete (`apt-cache show PAQUETE`); sin ella, la referencia es la página `man` y `/usr/share/doc/PAQUETE/`.
 
 ---
 

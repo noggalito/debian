@@ -1,4 +1,4 @@
-# Plantilla de /etc/sysctl.d/99-hardening.conf v1.1
+# Plantilla de /etc/sysctl.d/99-hardening.conf v1.2
 # Hardening de kernel y red
 #
 # Aplicar con `sudo sysctl --system`, que recorre todos los directorios de
@@ -92,6 +92,18 @@ kernel.yama.ptrace_scope = 1
 # basta para saltarse la restricción —solo CAP_SYS_ADMIN—, así que un contenedor
 # que declare CAP_PERFMON esperando acceso a perf no lo obtendrá.
 kernel.perf_event_paranoid = 3
+
+# Impedir que un usuario sin privilegios cargue módulos de disciplina de línea
+# de TTY al abrir una terminal. Varias escaladas de privilegios del kernel han
+# pasado por disciplinas poco usadas que se cargaban así. Un servidor solo usa
+# la disciplina por defecto, que ya está cargada.
+dev.tty.ldisc_autoload = 0
+
+# Endurecer el compilador JIT de BPF también para root (constant blinding),
+# que dificulta usar programas BPF para inyectar código (JIT spraying). Tiene
+# un coste de rendimiento menor sobre los programas BPF, que en un servidor
+# como este se limitan a los de systemd.
+net.core.bpf_jit_harden = 2
 
 # Deshabilitar SysRq remoto (el "magic SysRq key" puede causar reboot, sync, kill all)
 kernel.sysrq = 0

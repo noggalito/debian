@@ -1,4 +1,4 @@
-# Plantilla de /etc/msmtprc v1.1
+# Plantilla de /etc/msmtprc v1.2
 # Variables que se sustituyen al desplegar:
 #   MIRELAY        - hostname del servidor SMTP de salida (ej. smtp.relay.example.com)
 #   MIPUERTO_SMTP  - puerto SMTP (587 STARTTLS / 465 TLS implícito).
@@ -16,10 +16,13 @@ tls             on
 tls_starttls    on
 tls_trust_file  /etc/ssl/certs/ca-certificates.crt
 tls_certcheck   on
-# logfile         /var/log/msmtp.log    # deshabilitado: usar syslog/journald
+# Log en archivo deshabilitado: se usa syslog/journald. Para activarlo, ver 19.13.
+# logfile         /var/log/msmtp.log
 syslog          on
 timeout         30
 aliases         /etc/msmtp/aliases
+# Usar siempre el "from" de la cuenta, aunque el programa que llama pase -f
+allow_from_override off
 
 # Cuenta principal (relay corporativo o Gmail con app password)
 account default
@@ -46,13 +49,10 @@ passwordeval    "cat /etc/msmtp/password"
 #
 #       cuerpo" | msmtp --debug -f origen@dominio.com destino@dominio.com
 #
-# - Si por alguna razón se prefiere log en archivo dedicado (no recomendado
-#   en el manual base), descomentar la línea `logfile` arriba y crear el
-#   archivo con permisos compatibles:
-#       sudo install -o root -g msmtp -m 0660 /dev/null /var/log/msmtp.log
-#   Atención: aun con permisos correctos, msmtp puede mostrar warnings
-#   "cannot log" al ser invocado desde usuarios no-root vía sendmail.
-#   Ver Anexo C.13 del manual.
+# - Si se prefiere un log en archivo dedicado (no recomendado en el manual
+#   base), seguir la sección 19.13: además de activar `logfile` hay que crear
+#   el archivo y permitir su escritura en el perfil de AppArmor de msmtp, que
+#   en Debian solo autoriza /var/log/msmtp (sin extensión).
 #
 # - Para Gmail con app password:
 #       host            smtp.gmail.com
