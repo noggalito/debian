@@ -5254,19 +5254,17 @@ Las direcciones son las del campo `Homepage` de cada paquete (`apt-cache show PA
 ## Historial de cambios
 
 - [0.13] – 2026-11-26
-  - Actualización de Debian 13.7 a 13.8, con las secciones 1 a 19 recorridas en una VM KVM instalada desde la ISO netinst.
+  - Actualización de Debian 13.7 a 13.8.
   - Pasos idempotentes: los respaldos `.ori` de 7.2 y 8.1 se hacen solo la primera vez, `52unattended-upgrades-local` se crea con `install` y lo que añaden 16.3, 16.4 y el correo de AIDE (14.3) solo se escribe si falta.
   - Correcciones para la instalación desde ISO: `machine-id` frente al Product UUID (7.6), el `sources.list` que deja la netinst (8), el journal persistente (18.1), `PASS_MIN_LEN` ausente de `login.defs` (9.4) y el error de vsock aunque exista `/dev/vsock` (2.5.2).
   - AIDE excluye `/run/dhcpcd`, advierte de los archivos de trabajo en `/root` y `/home`, aplica el correo después de la sección 20 y se regenera al cerrar la Etapa III; la plantilla `modprobe` pasa a v1.2 por la referencia al runbook (§22.3).
-  - Se redactan como variables el efecto de `libpam-pwquality` sobre faillock (9.4) y el índice de lynis (14.5), se amplían las sesiones que bloquean el reinicio automático (16.4) y los errores esperados del arranque (18.1.2), y el historial y el To-do pasan al final del manual.
-
+  - Se redactan como variables el efecto de `libpam-pwquality` sobre faillock (9.4) y el índice de lynis (14.5), se amplían las sesiones que bloquean el reinicio automático (16.4) y los errores esperados del arranque (18.1.2).
 - [0.12] – 2026-11-20
   - La §21.3.6 deja de ser un esquema pendiente y se divide en cuatro: cuenta de solo lectura con `rrsync -ro` y el grupo `borg-lectura` en el servidor (§21.3.6), copia del directorio `/var/backups/borg` completo en el servidor de respaldos con snapshots btrfs, límite de espacio y avisos por correo (§21.3.7), encendido por RTC y apagado tras la copia (§21.3.8) y copia manual en uno o varios discos externos con LUKS2 (§21.3.9).
   - Las plantillas `01-hardening.conf` y `msmtprc` pasan a v1.4 y v1.3: en la v0.11 solo cambiaron las referencias a secciones de sus comentarios, y la versión sube para que un servidor desplegado con la anterior se distinga.
   - El script de 21.3.5 devuelve la lectura del repositorio al grupo `borg-lectura` tras cada respaldo. La §21.1 admite un repositorio propio de un rol al lado del `<host>` y aclara que el servidor de respaldos no guarda las passphrases.
   - 16.2 a 16.4: la configuración local de unattended-upgrades pasa a `52unattended-upgrades-local` y el `50` queda como lo instala el paquete; validado en un VPS. El aviso de 16.2 se corrige: el `50` no es un conffile de dpkg sino un archivo de `ucf`, que `debsums` no vigila.
   - Sale del To-do la comprobación de `/etc/cron.d/staticroute`, que es del proveedor y no de Debian: el resultado, que el tráfico entre vecinos de una subred de Contabo sí depende de esa ruta y que el cron pierde la carrera con `systemd-networkd`, está en la sección 4 de [`proveedores/contabo.md`](proveedores/contabo.md), que pasa a v0.2 con lo aprendido al recorrerlo contra un segundo VPS: root bloqueada y consola VNC, restos de la imagen en `sshd_config`, el fallo de cloud-init en cada arranque, `kernel.panic` conservado, firewall compartido entre instancias, ping descartado, borrado de las credenciales de `cntb` y bloques de 6.2 y 6.3 validados tal como están escritos.
-
 - [0.11] – 2026-11-19
   - Se intercambian las secciones 20 y 21: el reenvío de correo pasa a ser la §20 y los respaldos la §21; `bsd-mailx` sustituye a `mailutils` y msmtp añade su perfil de AppArmor y `from_full_name`.
   - La §21 se reescribe con un repositorio Borg cifrado por servidor, grupos de activos como prefijo de los archivos, script con argumento y unidades plantilla, y un esquema 3-2-1 con copia traída por el servidor de respaldos.
@@ -5326,5 +5324,4 @@ Las direcciones son las del campo `Homepage` de cada paquete (`apt-cache show PA
 
 ---
 
-<!-- markdownlint-disable-next-line MD033 -->
-[Despliegue de Debian 13 Trixie server](https://github.com/noggalito/debian) © 2026 by [Calú](https://github.com/calu777) in [noggalito](https://noggalito.com/) is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)<img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">
+[Despliegue de Debian 13 Trixie server](https://github.com/noggalito/debian) © 2026 by [Calú](https://github.com/calu777) in [noggalito](https://noggalito.com/) is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) ![CC](https://mirrors.creativecommons.org/presskit/icons/cc.svg) ![BY](https://mirrors.creativecommons.org/presskit/icons/by.svg) ![SA](https://mirrors.creativecommons.org/presskit/icons/sa.svg)
