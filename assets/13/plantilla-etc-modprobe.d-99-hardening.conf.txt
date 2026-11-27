@@ -1,4 +1,4 @@
-# Plantilla de /etc/modprobe.d/99-hardening.conf v1.1
+# Plantilla de /etc/modprobe.d/99-hardening.conf v1.2
 #
 # `install <modulo> /bin/true` hace que cualquier intento de cargar el módulo
 # ejecute /bin/true en su lugar: no se carga y modprobe termina con éxito.
@@ -44,7 +44,7 @@ install hfsplus /bin/true
 # Bloquearlo no afecta a un servidor de aplicaciones, pero rompe el montaje de
 # ISOs en anfitriones de virtualización (instalación de VMs, imágenes de
 # cloud-init NoCloud) y en servidores físicos con unidad óptica. Si el rol lo
-# necesita, comentar esta línea y anotarlo en el runbook (§19.3).
+# necesita, comentar esta línea y anotarlo en el runbook (§22.3).
 install udf /bin/true
 
 # Protocolos de red poco usados (DCCP, SCTP, RDS, TIPC)

@@ -6,73 +6,7 @@ Las subsecciones que empiezan por **Opcional** son recomendables pero no impresc
 
 ![Debian](<./assets/logo debian.png>)
 
-## a. Historial de cambios
-
-- [0.12] – 2026-11-20
-  - La §21.3.6 deja de ser un esquema pendiente y se divide en cuatro: cuenta de solo lectura con `rrsync -ro` y el grupo `borg-lectura` en el servidor (§21.3.6), copia del directorio `/var/backups/borg` completo en el servidor de respaldos con snapshots btrfs, límite de espacio y avisos por correo (§21.3.7), encendido por RTC y apagado tras la copia (§21.3.8) y copia manual en uno o varios discos externos con LUKS2 (§21.3.9).
-  - Las plantillas `01-hardening.conf` y `msmtprc` pasan a v1.4 y v1.3: en la v0.11 solo cambiaron las referencias a secciones de sus comentarios, y la versión sube para que un servidor desplegado con la anterior se distinga.
-  - El script de 21.3.5 devuelve la lectura del repositorio al grupo `borg-lectura` tras cada respaldo. La §21.1 admite un repositorio propio de un rol al lado del `<host>` y aclara que el servidor de respaldos no guarda las passphrases.
-  - 16.2 a 16.4: la configuración local de unattended-upgrades pasa a `52unattended-upgrades-local` y el `50` queda como lo instala el paquete; validado en un VPS. El aviso de 16.2 se corrige: el `50` no es un conffile de dpkg sino un archivo de `ucf`, que `debsums` no vigila.
-  - Sale del To-do la comprobación de `/etc/cron.d/staticroute`, que es del proveedor y no de Debian: el resultado, que el tráfico entre vecinos de una subred de Contabo sí depende de esa ruta y que el cron pierde la carrera con `systemd-networkd`, está en la sección 4 de [`proveedores/contabo.md`](proveedores/contabo.md), que pasa a v0.2 con lo aprendido al recorrerlo contra un segundo VPS: root bloqueada y consola VNC, restos de la imagen en `sshd_config`, el fallo de cloud-init en cada arranque, `kernel.panic` conservado, firewall compartido entre instancias, ping descartado, borrado de las credenciales de `cntb` y bloques de 6.2 y 6.3 validados tal como están escritos.
-
-- [0.11] – 2026-11-19
-  - Se intercambian las secciones 20 y 21: el reenvío de correo pasa a ser la §20 y los respaldos la §21; `bsd-mailx` sustituye a `mailutils` y msmtp añade su perfil de AppArmor y `from_full_name`.
-  - La §21 se reescribe con un repositorio Borg cifrado por servidor, grupos de activos como prefijo de los archivos, script con argumento y unidades plantilla, y un esquema 3-2-1 con copia traída por el servidor de respaldos.
-  - Se añaden el baneo permanente de direcciones (§11.7), `nftables` junto a fail2ban, NTS validado en chrony y el borrado de las copias de la contraseña inicial que deja cloud-init (§5.1).
-  - Se documentan efectos laterales observados: `UMASK 027` con debconf, `mail_badpass` sin correo con msmtp, `LoginGraceTime` y `PerSourcePenalties`, y el ruido de sysstat y `/tmp` en AIDE.
-- [0.10] – 2026-10-18
-  - Reorganización y renumeración: plantillas en §3, aprovisionamiento del proveedor en §5, firewall del proveedor en §11.6, diagnóstico como único anexo y referencias al final
-  - Lo propio de cada proveedor pasa a `proveedores/`, y la restricción a un CDN y el análisis de logs web al manual de Caddy. Se retiran rkhunter y las secciones redundantes
-  - Correcciones de fondo en PAM y faillock (§9.3.3), SSH (§10), auditd y AIDE (§14), AppArmor con auditd (§15.3), journald (§18) y msmtp (§21)
-- [0.9] – 2026-10-09
-  - El Anexo C de reenvío de correo con `msmtp` pasa a ser la sección 19 de la Etapa IV, y la documentación operativa pasa a ser la sección 20. Todas las referencias internas quedan renumeradas
-  - §9.6 reescrita: aviso de que no se ejecuta en el despliegue base, descarga de los rangos a un archivo con comprobación antes de tocar ninguna regla, retiro de las reglas abiertas por número y comprobación mensual de la lista publicada
-  - Nuevo Anexo C con el firewall del proveedor de nube, que es la capa que filtra antes de UFW y la única que alcanza a los puertos publicados por contenedores. Incluye el procedimiento para Azure
-  - §11.1, §11.3 y §12.4 advierten qué revisar cuando el rol del servidor incluye contenedores
-  - §14.2 aclara que los repositorios de terceros quedan fuera de las actualizaciones automáticas
-  - Anexo C: nueva C.4 con el firewall de VPS de Hostinger a través de su API, verificada en un despliegue detrás de un borde. La verificación desde fuera y el mantenimiento pasan a ser C.5 y C.6
-- [0.8] – 2026-09-24
-  - Cambio de la URL del manual y actualización de las URL de las plantillas
-- [0.7] – 2026-09-13
-  - Nueva §9.6 con la restricción del origen a los rangos de un proxy de borde o CDN
-  - Nueva §10.5 sobre los límites del modelo de baneo por IP frente a campañas distribuidas
-  - Nueva §16.5 sobre retención de logs frente a necesidad forense
-  - Nuevo Anexo B.11 con el análisis de logs de acceso en formato JSON
-- [0.6] – 2026-09-12
-  - Arreglos menores en la plantilla `/etc/hosts` del apartado §5.2
-  - Actualización de Debian 13.6 a 13.7
-  - Se retiran los checklists de cierre de todas las secciones
-  - Nueva §14.9 con el procedimiento posterior a un point release
-- [0.5] – 2026-07-24
-  - Modificación de las variables `ALLOW_SSH_ROOT_USER=unset` y `ALLOW_SSH_PROT_V1=2` en el apartado §12.2
-- [0.4] – 2026-07-14
-  - Actualización de Debian 13.5 a 13.6
-- [0.3] – 2026-05-20
-  - Seguridad: URLs de plantillas migradas a SHA anclado; nuevo hardening de sudo/pam_faillock; refuerzo SSH con   DisableForwarding; passphrase de Borg protegida con read -s.
-  - Correcciones: SystemMaxUse de journald reducido a 1 G; nota sobre PASS_MIN_LEN ignorado con pam_pwquality; variable $MIPUERTO_SMTP para evitar colisión; LUKS2/Argon2id/GRUB aclarado; sed de dropbear reemplazado por secuencia robusta; fixes de numeración y typo.
-  - Mejoras: nueva §12.6 con auditoría lynis; soporte NTS en chrony; pool NTP por país; nota de egreso en UFW; referencias cruzadas entre MTA, fail2ban y pam_faillock.
-- [0.2] – 2026-05-16
-  - Actualización de Debian 13.4 a 13.5
-  - Inclusión del override en C.6.1
-- [0.1] – 2026-04-28
-  - Manual terminado para la versión 13.4.0 de Debian
-
-## b. To-do
-
-- Nuevo manual de reenvío de logs a un servidor central con `systemd-journal-upload` y `systemd-journal-remote`
-- Evaluar y documentar CrowdSec como complemento o sustituto de fail2ban (§12.5). Requiere validación en entorno propio antes de escribirse como procedimiento: agente, escenarios, lista comunitaria y componente AppSec
-- Validar las copias de la sección 21.3.6 (servidor de respaldos y disco externo); la copia local, la automatización y la restauración se validaron en un VPS de Contabo el 2026-11-19
-- Inclusión de Ansible
-- Evaluar Forward Secure Sealing (FSS) del journal para servidores con requisitos de auditoría (§18.1.2)
-- Inclusión de Health Check, monitoreo y alerta, con uso de mensajería instantánea (Telegram) o correo electrónico
-- Verificar en entorno propio las órdenes de `az` de [`proveedores/azure.md`](proveedores/azure.md). Están tomadas de la referencia de la CLI de Azure y no de una corrida completa
-- Verificar en entorno propio las dos órdenes de [`proveedores/hostinger.md`](proveedores/hostinger.md) que no se han ejecutado contra la API de Hostinger: el alta de una regla con origen abierto y el borrado de una regla por su identificador
-- Documentar el filtrado de puertos publicados por contenedores en el propio host, para servidores sin firewall de proveedor (11.6.1)
-- Verificar sobre un servidor con contenedores la exclusión de AIDE de §14.3 y revisar el primer reporte diario posterior
-- Diseñar una arquitectura de respaldo 3-2-1, donde 2 sea una unidad de almacenamiento adicional cifrada y conectada al servidor para ejecutar respaldos periódicos; y 3 sea Borg en un repo externo al servidor
-- Auditar los servidores desplegados con versiones ≤ 0.9 de este manual (p. ej. `maracuya` y `arandano`): en el layout anterior de §9.3.3 las líneas de faillock iban debajo del bloque gestionado y `pam_deny` abortaba la pila antes del `preauth`, de modo que `pam_faillock` nunca contaba fallos. Se corrige aplicando la sección tal como está ahora
-
-## c. Requerimientos previos
+## Requerimientos previos
 
 - Llave SSH Ed25519 para el punto "6.2 Copia de la llave pública del administrador". Manual para generarla disponible [aquí](https://github.com/noggalito/llave-ssh)
 - Una cuenta de correo electrónico (a veces con contraseña por aplicación) desde donde se enviarán las notificaciones del servidor
@@ -288,13 +222,17 @@ Las subsecciones que empiezan por **Opcional** son recomendables pero no impresc
 
 ### [Referencias](#referencias)
 
+### [Historial de cambios](#historial-de-cambios)
+
+### [To-do](#to-do)
+
 ---
 
 ## Etapa I — Preparación
 
 ### 1. Descarga y validación de la ISO
 
-Solo aplica cuando se instala desde ISO. Si el proveedor entrega Debian preinstalado, se pasa a la sección 2.5. La imagen es la [netinst](https://cdimage.debian.org/debian-cd/current/amd64/bt-cd/).
+Solo aplica cuando se instala desde ISO. Si el proveedor entrega Debian preinstalado, se pasa a la sección 2.5. La imagen es la [netinst](https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/).
 
 #### 1.1 Variables de trabajo
 
@@ -344,7 +282,7 @@ gpg --verify SHA512SUMS.sign SHA512SUMS
 Resultado esperado (la fecha varía):
 
 ```text
-gpg: Firmado el sáb 12 set 2026 11:20:46 -05
+gpg: Firmado el sáb 21 nov 2026 13:13:00 -05
 gpg:                usando RSA clave DF9B9C49EAA9298432589D76DA87E80D6294BE9B
 gpg: Firma correcta de "Debian CD signing key <debian-cd@lists.debian.org>" [desconocido]
 gpg: ATENCIÓN: ¡Esta clave no está certificada por una firma de confianza!
@@ -363,7 +301,7 @@ sha512sum --ignore-missing -c SHA512SUMS
 Resultado esperado:
 
 ```text
-debian-13.7.0-amd64-netinst.iso: La suma coincide
+debian-13.8.0-amd64-netinst.iso: La suma coincide
 ```
 
 `--ignore-missing` evita errores por las demás ISO de `SHA512SUMS` que no se descargaron. Con la ISO verificada, se saca del directorio de trabajo (aquí, al directorio personal) y se borra el resto:
@@ -585,10 +523,8 @@ exit
 `systemctl --failed` debe devolver *"0 loaded units listed"* antes de continuar.
 
 > En imágenes cloud root no tiene contraseña y `su -` no funciona; se usa `sudo -i`, aquí y en 2.5.3.
-
-<!-- -->
-
-> En VMs sin dispositivo vsock (KVM sin `vhost-vsock`, Hyper-V/Azure y muchos VPS) aparece `systemd-ssh-generator: Failed to query local AF_VSOCK CID` con `failed with exit status 1`. Es inofensivo (Debian #1137216), pero se repite en cada `daemon-reload` y deja `journalctl -p err` siempre sucio. Se enmascara el generador desde la shell de root, o con `sudo` tras la sección 4:
+>
+> En VMs sin dispositivo vsock del hipervisor (KVM sin `vhost-vsock`, aunque exista `/dev/vsock`; Hyper-V/Azure y muchos VPS) aparece `systemd-ssh-generator: Failed to query local AF_VSOCK CID` con `failed with exit status 1`. Es inofensivo (Debian #1137216), pero se repite en cada `daemon-reload` y deja `journalctl -p err` siempre sucio. Se enmascara el generador desde la shell de root, o con `sudo` tras la sección 4:
 >
 > ```bash
 > mkdir -p /etc/systemd/system-generators
@@ -720,7 +656,7 @@ echo "ASSETS_BASE = ${ASSETS_BASE}"
 | `plantilla-etc-ssh-sshd_config.d-01-hardening.conf.txt` | v1.4    | 10.1    | `/etc/ssh/sshd_config.d/01-hardening.conf` | `$MIPUERTO`, `$MIUSUARIO`                                                              |
 | `plantilla-etc-fail2ban-jail.local.txt`                 | v1.0    | 12.2    | `/etc/fail2ban/jail.local`                 | `$MIPUERTO`                                                                            |
 | `plantilla-etc-sysctl.d-99-hardening.conf.txt`          | v1.2    | 13.1    | `/etc/sysctl.d/99-hardening.conf`          | (sin variables)                                                                        |
-| `plantilla-etc-modprobe.d-99-hardening.conf.txt`        | v1.1    | 13.2    | `/etc/modprobe.d/99-hardening.conf`        | (sin variables)                                                                        |
+| `plantilla-etc-modprobe.d-99-hardening.conf.txt`        | v1.2    | 13.2    | `/etc/modprobe.d/99-hardening.conf`        | (sin variables)                                                                        |
 | `plantilla-etc-audit-rules.d-99-hardening.rules.txt`    | v1.1    | 14.1    | `/etc/audit/rules.d/99-hardening.rules`    | (sin variables)                                                                        |
 | `plantilla-etc-cron.hourly-server-check.txt`            | v1.1    | 19.2    | `/etc/cron.hourly/server-check`            | (sin variables)                                                                        |
 | `plantilla-etc-msmtprc.txt`                             | v1.3    | 20.4    | `/etc/msmtprc`                             | `$MIRELAY`, `$MIPUERTO_SMTP`, `$MIUSUARIO_SMTP`, `$MIFROM`                             |
@@ -1090,8 +1026,8 @@ sudo hostnamectl set-hostname "${MIHOST:?}"
 El hostname debe resolverse localmente, sin pasar por DNS:
 
 ```bash
-# Respaldar el archivo original
-sudo cp /etc/hosts /etc/hosts.ori
+# Respaldar el archivo original (solo la primera vez)
+[ -e /etc/hosts.ori ] || sudo cp /etc/hosts /etc/hosts.ori
 
 # Definir las variables $MIHOST y $MIFQDN
 export MIHOST=villonaco
@@ -1394,7 +1330,7 @@ Tras reconectar, se repite 7.5.7.
 
 #### 7.6 `machine-id`
 
-**Opcional:** solo en VMs clonadas de una plantilla, donde el identificador se duplica y causa concesiones DHCP repetidas y logs mezclados. En una VM KVM recién creada, systemd lo toma del Product UUID de SMBIOS (`cat /sys/class/dmi/id/product_uuid`), que el hipervisor asigna a cada VM: si coinciden, es único y no se regenera.
+**Opcional:** solo en VMs clonadas de una plantilla, donde el identificador se duplica y causa concesiones DHCP repetidas y logs mezclados. En una imagen que arranca con `/etc/machine-id` vacío, systemd lo toma del Product UUID de SMBIOS (`cat /sys/class/dmi/id/product_uuid`), que el hipervisor asigna a cada VM: si coinciden, es único y no se regenera. Una instalación desde ISO lo genera al azar y no coincide con el Product UUID, sin que eso indique un clon; lo que delata un clon es el mismo `machine-id` en dos VMs.[^machine-id]
 
 ```bash
 cat /etc/machine-id
@@ -1409,14 +1345,16 @@ sudo dbus-uuidgen --ensure
 sudo reboot
 ```
 
+[^machine-id]: Observado el 2026-11-26 en una instalación desde la ISO netinst 13.8.
+
 ### 8. Repositorios y primera actualización completa
 
-La `netinst` deja el CD-ROM como repositorio. Aquí se pasa a los mirrors oficiales y se actualiza todo.
+La `netinst` instalada sin red deja el CD-ROM como único repositorio; con red, lo deja comentado y apunta a `deb.debian.org` por `http`, con `deb-src` y solo `main non-free-firmware`.[^netinst-sources] En los dos casos se pasa al contenido de 8.2 y se actualiza todo.
 
 #### 8.1 Respaldo del `sources.list` original
 
 ```bash
-sudo cp /etc/apt/sources.list /etc/apt/sources.list.ori
+[ -e /etc/apt/sources.list.ori ] || sudo cp /etc/apt/sources.list /etc/apt/sources.list.ori
 ```
 
 #### 8.2 Edición del `sources.list`
@@ -1457,6 +1395,8 @@ sudo mv /etc/apt/sources.list.d/debian.sources /etc/apt/debian.sources.ori
 ```
 
 También vale lo contrario: mantener el formato deb822 y llevar a `debian.sources` los componentes de arriba. Lo que no debe haber son las dos fuentes activas.
+
+[^netinst-sources]: Observado el 2026-11-26 con la ISO netinst 13.8 y red durante la instalación.
 
 #### 8.3 Actualización completa
 
@@ -1581,9 +1521,7 @@ El archivo se escribe y se valida en `/tmp` porque todo lo que está en `/etc/su
 > ```text
 > Defaults:miusuario_ansible !requiretty
 > ```
-
-<!-- -->
-
+>
 > `mail_badpass` no envía correo con el msmtp de la sección 20. El sudo de Debian está compilado con `--disable-root-mailer` y lanza el envío como el usuario que falló, sin sus grupos suplementarios; sin el grupo `msmtp`, msmtp no puede leer `/etc/msmtprc` y termina con el código 78 sin dejar rastro en el journal (validado en un VPS de Contabo el 2026-11-19 con `setpriv --clear-groups`). La línea se mantiene por si el MTA cambia; los intentos fallidos quedan igualmente en el journal de sudo y en `pam_faillock` (9.3.3).
 
 ##### 9.3.2 Verificación
@@ -1841,7 +1779,7 @@ PASS_WARN_AGE   14
 UMASK           027
 ```
 
-`UMASK` no viene en el `login.defs` de Debian 13 y se añade. La aplica `pam_umask` en cada sesión: sin ella vale 022 y los archivos nuevos son legibles por cualquiera. Con `USERGROUPS_ENAB yes`, los bits de grupo se igualan a los del propietario en usuarios con grupo privado, así que la máscara efectiva es 007; lo que importa es que el resto de usuarios queda sin acceso. Responde a AUTH-9328 de lynis (14.5) y rige desde el siguiente inicio de sesión.
+`PASS_MIN_LEN` y `UMASK` no vienen en el `login.defs` de Debian 13 y se añaden. `UMASK` la aplica `pam_umask` en cada sesión: sin ella vale 022 y los archivos nuevos son legibles por cualquiera. Con `USERGROUPS_ENAB yes`, los bits de grupo se igualan a los del propietario en usuarios con grupo privado, así que la máscara efectiva es 007; lo que importa es que el resto de usuarios queda sin acceso. Responde a AUTH-9328 de lynis (14.5) y rige desde el siguiente inicio de sesión.
 
 También alcanza a lo creado con `sudo`, que combina su 022 con la de la sesión: `sudo mkdir` deja 0750 y `sudo tee` 0640. Los servicios que corren como root no lo notan, pero las herramientas que corren como usuario dejan de leer esos archivos sin avisar (`systemd-analyze cat-config` omite un drop-in ilegible). Por eso, desde aquí, los archivos bajo `/etc` se crean con `install` y permisos explícitos.
 
@@ -1862,7 +1800,7 @@ Contraseñas robustas con `libpam-pwquality`:
 sudo apt install -y libpam-pwquality
 ```
 
-> **ATENCIÓN.** Su postinst ejecuta `pam-auth-update` y puede deshacer la pila de faillock: en el VPS observado, la contraseña correcta dejaba entrar a una cuenta bloqueada. Justo después se aplica la comprobación de la ATENCIÓN de 9.3.3.
+> **ATENCIÓN.** Su postinst ejecuta `pam-auth-update`, y el efecto sobre la pila de faillock varía: en unas instalaciones la deja intacta y en otras la deshace, de modo que la contraseña correcta deja entrar a una cuenta bloqueada. Por eso, justo después se aplica la comprobación de la ATENCIÓN de 9.3.3.
 
 El paquete añade `pam_pwquality.so retry=3` a `common-password`, dentro del bloque gestionado, donde cualquier parámetro se perdería. La política va en `/etc/security/pwquality.conf`, que `pam-auth-update` no toca:
 
@@ -2574,13 +2512,9 @@ sudo install -m 0644 -o root -g root /tmp/plantilla-etc-modprobe.d-99-hardening.
 > grep -nE 'overlay|br_netfilter|bridge|veth|vxlan|ip_vs' /etc/modprobe.d/99-hardening.conf \
 >   || echo "✓ ninguno bloqueado"
 > ```
-
-<!-- -->
-
+>
 > Bloquear `udf` impide montar ISOs. En un host de virtualización se comenta esa línea y se anota en el runbook (§22.3).
-
-<!-- -->
-
+>
 > **`usb-storage`.** En físicos donde se conectan discos de respaldo no se bloquea; en colocation o centro de datos, sí:
 >
 > ```text
@@ -2795,12 +2729,12 @@ sudo apt install -y aide aide-common
 
 ##### Exclusión del ruido propio de este servidor
 
-Debian ya trata como volátiles casi todas las rutas de `/var/log` y `/run`, pero no cinco que genera este manual:
+Debian ya trata como volátiles casi todas las rutas de `/var/log` y `/run`, pero no cinco que genera este manual ni el estado del cliente DHCP:
 
 ```bash
 printf '%s\n' '!/var/log/sudo-io' '!/var/log/audit' '!/var/log/aide/aideinit\.log$' '!/var/log/sysstat' \
   | sudo install -m 0644 -o root -g root /dev/stdin /etc/aide/aide.conf.d/70_local_logs
-printf '%s\n' '!/run/faillock' \
+printf '%s\n' '!/run/faillock' '!/run/dhcpcd' \
   | sudo install -m 0644 -o root -g root /dev/stdin /etc/aide/aide.conf.d/70_local_run
 sudo aide --config /etc/aide/aide.conf --config-check && echo "✓ configuración válida"
 ```
@@ -2810,8 +2744,9 @@ sudo aide --config /etc/aide/aide.conf --config-check && echo "✓ configuració
 - `/var/log/aide/aideinit.log`: se escribe después de la foto y, con `COPYNEWDB=no`, saldría todos los días. El punto escapado y el `$` limitan la exclusión a ese archivo, y los informes del mismo directorio siguen vigilados.
 - `/var/log/sysstat`: la recogida histórica de 19.1 reescribe el archivo del día cada 10 minutos.
 - `/run/faillock`: `pam_faillock` (9.3.3) lo actualiza en cada `sudo`.
+- `/run/dhcpcd`: cuando la concesión DHCP la gestiona dhcpcd (`/etc/resolv.conf` empieza con `# Generated by dhcpcd`), cada renovación reescribe su estado. Sin dhcpcd, la exclusión no tiene efecto.
 
-AIDE vigila también `/tmp`: un script temporal que exista al crear la base y desaparezca después sale en el informe como añadido o eliminado. Se trabaja fuera de `/tmp` mientras se crea la base, o se acepta esa diferencia en el primer check.
+AIDE vigila también `/tmp`, `/root` y `/home`: un archivo de trabajo que exista al crear la base y desaparezca después, como un script o un informe guardado, sale en el informe como añadido o eliminado. Mientras se crea la base no se dejan archivos de trabajo en esas rutas, o se acepta esa diferencia en el primer check.
 
 ##### Inicialización de la base de datos
 
@@ -2934,11 +2869,11 @@ grep -n '^QUIETREPORTS' /etc/default/aide
 
 ##### Envío del informe por correo
 
-El envoltorio de `aide-common` solo llama a `mail` corriendo como root o desde cron: el servicio systemd corre como `_aide` y, sin ajustar nada, el informe no sale — en el journal queda `WARN: it is not possible to use mail(1) unless aide is run as root or as non-root with added capabilities` y el reporte solo existe en `/var/log/aide/aide.log`. Dos ajustes lo ponen en marcha (validado en VM con Gmail como relay):
+El envoltorio de `aide-common` solo llama a `mail` corriendo como root o desde cron: el servicio systemd corre como `_aide` y, sin ajustar nada, el informe no sale — en el journal queda `WARN: it is not possible to use mail(1) unless aide is run as root or as non-root with added capabilities` y el reporte solo existe en `/var/log/aide/aide.log`. Dos ajustes lo ponen en marcha (validado en VM con Gmail como relay). Se aplican después de la sección 20: el grupo `msmtp` lo crea la instalación de msmtp, y una unidad con `SupplementaryGroups` de un grupo inexistente no arranca:
 
 ```bash
 # 1. Que el envoltorio use mail(1) sin comprobar el uid
-sudo tee -a /etc/default/aide >/dev/null <<'EOF'
+grep -q '^MAILCMD=' /etc/default/aide || sudo tee -a /etc/default/aide >/dev/null <<'EOF'
 
 # Enviar el informe con mail(1) aunque el servicio corre como _aide
 MAILCMD="/usr/bin/mail"
@@ -3014,7 +2949,7 @@ sudo apt install -y lynis
 sudo lynis audit system
 ```
 
-`Hardening index` va de 0 a 100. En el despliegue de referencia, con el manual aplicado hasta 14.4: `Great, no warnings`, índice 81 y 29 sugerencias. La puntuación no es un objetivo; conviene saber qué sugerencias no se persiguen.
+`Hardening index` va de 0 a 100. El índice y el número de sugerencias varían entre despliegues: con el manual aplicado hasta 14.4 se obtuvieron `Great, no warnings`, índice 81 y 29 sugerencias, y hasta la sección 15, también sin warnings, 79 y 30. La puntuación no es un objetivo; conviene saber qué sugerencias no se persiguen.
 
 No aplican, porque el manual ya lo cubre o lynis lo lee mal:
 
@@ -3027,6 +2962,7 @@ No aplican, porque el manual ya lo cubre o lynis lo lee mal:
 - BOOT-5180 y FIRE-4513: informativas.
 - HRDN-7222 solo aparece si hay compilador; en una imagen cloud sin `binutils` no sale.
 - `[LYNIS]`, versión antigua: ver más abajo.
+- DEB-0831 y PKGS-7420, needrestart y actualizaciones automáticas: DEB-0831 desaparece al instalar needrestart, opcional en 8.4, y PKGS-7420 con la sección 16; antes de eso, las dos aparecen.
 
 Se descartan a propósito:
 
@@ -3195,6 +3131,8 @@ Descarga todo perfil cargado cuyo archivo desapareció y excluye los dinámicos 
 
 Al terminar el despliegue base, UFW y el firewall del proveedor admiten solo SSH. La restricción de los puertos web a un proxy de borde se aplica después, con la sección 17 del manual de Caddy. La Etapa IV mantiene este estado en el tiempo.
 
+Antes de pasar a la Etapa IV se revisa el check de AIDE y se regenera la base (14.3, «Mantenimiento tras cambios legítimos»): los paquetes de 14.4, 14.5 y 15.2 se instalaron después de crearla y aparecen como cientos de entradas añadidas.
+
 ---
 
 ## Etapa IV — Mantenimiento y actualizaciones
@@ -3227,7 +3165,7 @@ Si `unattended-upgrades` aún no se ha ejecutado, el log no existe y `tail` fall
 De serie, `/etc/apt/apt.conf.d/50unattended-upgrades` habilita el repositorio principal y seguridad y deja comentado `-updates`. Ese archivo no se edita: lo propio del servidor va en `/etc/apt/apt.conf.d/52unattended-upgrades-local`, que APT lee después. Las listas como `Origins-Pattern` se suman entre archivos, y en los valores simples (`Mail`, `Automatic-Reboot`) prevalece el del archivo que se lee después. Este manual añade `-updates`:
 
 ```bash
-sudo tee /etc/apt/apt.conf.d/52unattended-upgrades-local > /dev/null <<'EOF'
+sudo install -m 0644 -o root -g root /dev/stdin /etc/apt/apt.conf.d/52unattended-upgrades-local <<'EOF'
 // Configuración local de unattended-upgrades (manual de Debian 13 server, 16.2 a 16.4).
 // 50unattended-upgrades queda como lo instala el paquete.
 Unattended-Upgrade::Origins-Pattern {
@@ -3257,8 +3195,6 @@ apt-config dump | grep -E '^Unattended-Upgrade'
 
 [^uu-local]: Validado el 2026-11-20 en un VPS de Contabo con unattended-upgrades 2.12: con el `50` devuelto a la plantilla (misma suma MD5 que la de `/usr/share/unattended-upgrades/`) y el `52` con `-updates`, el correo y `Automatic-Reboot "false"`, `apt-config dump` muestra los mismos orígenes y valores que con el `50` editado, `ucfq` pasa a `Changed No` y `unattended-upgrade --dry-run -d` lista las cuatro fuentes permitidas, `trixie-updates` incluida.
 
-<!-- -->
-
 > **Los repositorios de terceros quedan fuera.** Un paquete de un repositorio externo (motor de contenedores, proxy inverso, base de datos del fabricante) no se actualiza solo, ni siquiera con parches de seguridad. Como varios reinician su servicio al actualizarse, se decide por paquete en el manual del rol: añadir su origen a la lista o anotar su actualización como tarea periódica con responsable. Los orígenes se leen así:
 >
 > ```bash
@@ -3272,7 +3208,8 @@ apt-config dump | grep -E '^Unattended-Upgrade'
 En el `52unattended-upgrades-local` de 16.2:
 
 ```bash
-sudo tee -a /etc/apt/apt.conf.d/52unattended-upgrades-local > /dev/null <<'EOF'
+grep -q '^Unattended-Upgrade::Mail ' /etc/apt/apt.conf.d/52unattended-upgrades-local \
+  || sudo tee -a /etc/apt/apt.conf.d/52unattended-upgrades-local > /dev/null <<'EOF'
 Unattended-Upgrade::Mail "root";
 Unattended-Upgrade::MailReport "on-change";
 EOF
@@ -3285,7 +3222,8 @@ EOF
 Kernel, libc, OpenSSL o systemd solo se aplican al reiniciar; hasta entonces sigue corriendo el código vulnerable. También en el `52`:
 
 ```bash
-sudo tee -a /etc/apt/apt.conf.d/52unattended-upgrades-local > /dev/null <<'EOF'
+grep -q '^Unattended-Upgrade::Automatic-Reboot ' /etc/apt/apt.conf.d/52unattended-upgrades-local \
+  || sudo tee -a /etc/apt/apt.conf.d/52unattended-upgrades-local > /dev/null <<'EOF'
 Unattended-Upgrade::Automatic-Reboot "true";
 Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
 Unattended-Upgrade::Automatic-Reboot-Time "07:30";
@@ -3293,7 +3231,7 @@ EOF
 apt-config dump | grep -E '^Unattended-Upgrade::(Mail|Automatic-Reboot)'
 ```
 
-`Automatic-Reboot-WithUsers "false"` pospone el reinicio si hay sesiones, pero la espera es silenciosa e indefinida: una sesión de `tmux` desasociada (6.4) puede dejar registro en `utmp` y bloquear el reinicio noche tras noche. `who` lo muestra.
+`Automatic-Reboot-WithUsers "false"` pospone el reinicio si hay sesiones, pero la espera es silenciosa e indefinida: cualquier sesión abierta lo bloquea noche tras noche, sea una consola que quedó con la sesión iniciada, una conexión SSH olvidada, la conexión maestra de `ControlPersist` (10.4) mientras dura o una sesión de `tmux` desasociada (6.4), que deja registro en `utmp`. `who` las muestra.
 
 La hora va después de la actualización: `apt-daily-upgrade.timer` dispara a las 06:00 con hasta 60 minutos de retardo, y el reinicio espera a la siguiente `Automatic-Reboot-Time`. Con 04:00 se iría a la madrugada siguiente, con el kernel nuevo instalado y el viejo en marcha veintidós horas; con 07:00 pasa a veces; 07:30 deja margen. La hora es la de la zona de 7.3. Si un rol no admite el reinicio nocturno, se pone `Automatic-Reboot "false"` en el `52` y su manual documenta cuándo se reinicia.
 
@@ -3583,7 +3521,7 @@ Los logs son la primera fuente de diagnóstico y la única evidencia tras un inc
 
 #### 18.1 Configuración de `journald`
 
-journald guarda en `/var/log/journal/` si existe (persistente) y en `/run/log/journal/` si no (se pierde al reiniciar). En la imagen cloud de Debian 13 el directorio ya existe, y el journal es persistente desde el primer arranque.
+journald guarda en `/var/log/journal/` si existe (persistente) y en `/run/log/journal/` si no (se pierde al reiniciar). En Debian 13 el directorio ya existe tras la instalación, tanto en la imagen cloud como desde la ISO, y el journal es persistente desde el primer arranque.
 
 ```bash
 sudo journalctl --disk-usage
@@ -3687,7 +3625,7 @@ sudo journalctl --verify
 - `-b -1` necesita un arranque anterior registrado; si no lo hay, da `No journal boot entry found for the specified boot (-1)`. `--list-boots` lo dice antes.
 - Una fecha sin hora es las 00:00: `--until "2026-09-26"` excluye ese día; para incluirlo, `--until "2026-09-26 23:59:59"`.
 - Los meses siguen el locale (7.4): con `es_PE.UTF-8`, septiembre es `set`. Para scripts, `-o short-iso`.
-- En un servidor recién desplegado, `-b -p err` solo debe mostrar entradas conocidas: el error de `systemd-ssh-generator` (2.5.2) hasta el siguiente arranque, y los fallos de autenticación de las pruebas de faillock (9.3.3) o de una conexión con demasiadas llaves (10.4) (`3 incorrect password attempts`, `a password is required`, `maximum authentication attempts exceeded`). Cualquier otra merece atención.
+- En un servidor recién desplegado, `-b -p err` solo debe mostrar entradas conocidas: el error de `systemd-ssh-generator` (2.5.2) hasta el siguiente arranque, y los fallos de autenticación de las pruebas de faillock (9.3.3) o de una conexión con demasiadas llaves (10.4) (`3 incorrect password attempts`, `a password is required`, `maximum authentication attempts exceeded`). Con dhcpcd en una red sin DHCPv6 aparece además, en cada arranque, `dhcpcd[...]: <interfaz>: failed to request DHCPv6 information`, que es inofensivo. Cualquier otra merece atención.
 - Durante un recorrido intensivo del disco, como el de AIDE (14.3), puede salir `auditd: Error receiving audit netlink packet (No buffer space available)`: el kernel no pudo encolar más eventos en el búfer de recepción del socket netlink de `auditd` ante una ráfaga. Es un mecanismo distinto del contador `lost` (desbordes del `backlog_limit`) y del `backlog` momentáneo; si después `auditctl -s` sigue mostrando `lost 0`, como se observó, no se perdió ningún evento. No se reprodujo en cuatro recorridos de AIDE seguidos; si se repite fuera de esos momentos, se revisa `-b 8192` (14.1).
 - Con el usuario en `adm` (9.2), `journalctl` lee todo sin `sudo`. Los ejemplos usan `sudo` para no depender de eso; la excepción de 9.3.1 evita que se dupliquen en `/var/log/sudo-io/`.
 
@@ -3893,7 +3831,7 @@ done
 
 - Aliases en `/etc/msmtp/aliases`: msmtp no lee `/etc/aliases`, y sin traducción el relay rechaza destinatarios como `root`.
 - Logs en journald (18.1), sin archivo propio, que daría problemas de permisos y pediría logrotate.
-- Outlook y Hotmail personales quedan fuera porque exigen XOAUTH2.
+- Outlook y Hotmail personales como remitentes quedan fuera porque exigen XOAUTH2.
 
 #### 20.2 Requisitos previos
 
@@ -3916,11 +3854,7 @@ sudo apt -y purge exim4-base exim4-config exim4-daemon-light mailutils mailutils
 sudo apt -y autoremove --purge
 ```
 
-> Antes de instalar `msmtp-mta`, `autoremove` no retira nada, porque `exim4` era el único MTA. El buzón `/var/mail/root` se conserva; conviene leerlo una vez con `sudo less /var/mail/root`.
-
-<!-- -->
-
-> Si estas órdenes van dentro de un script que se pasa por la entrada estándar (`ssh servidor 'sudo bash -s' < script`), `apt` y los scripts de los paquetes leen esa misma entrada y se comen el resto del script: un paquete puede quedar desempaquetado sin configurar (`iU` en `dpkg -l`). Dentro de esos scripts, `apt` se ejecuta con `</dev/null`, y un paquete a medias se termina con `sudo dpkg --configure -a`.
+Antes de instalar `msmtp-mta`, `autoremove` no retira nada, porque `exim4` era el único MTA. El buzón `/var/mail/root` se conserva; conviene leerlo una vez con `sudo less /var/mail/root`. Si estas órdenes van dentro de un script que se pasa por la entrada estándar (`ssh servidor 'sudo bash -s' < script`), `apt` y los scripts de los paquetes leen esa misma entrada y se comen el resto del script: un paquete puede quedar desempaquetado sin configurar (`iU` en `dpkg -l`). Dentro de esos scripts, `apt` se ejecuta con `</dev/null`, y un paquete a medias se termina con `sudo dpkg --configure -a`.
 
 ```bash
 dpkg -l 'exim4*' | grep -E '^(ii|rc)' || echo "exim4 eliminado por completo"
@@ -3978,8 +3912,6 @@ Con varios servidores avisando a la misma dirección, el nombre visible del remi
 sudo grep -q '^from_full_name' /etc/msmtprc || sudo sed -i "/^from /a from_full_name  $(hostname -s)" /etc/msmtprc
 sudo grep -E '^(from|from_full_name) ' /etc/msmtprc
 ```
-
-<!-- -->
 
 > **Ejemplo con Gmail.** Variables:
 >
@@ -4912,7 +4844,7 @@ Lo que se configuró, por qué y cómo operarlo, para que el servidor no dependa
 | FQDN                         | `villonaco.lan`                                                     | `hostname -f`                              |
 | Rol                          | "Servidor base — sin rol específico aún"                            | manual / decisión del operador             |
 | Ubicación física / proveedor | "VM local en estación de trabajo del admin" / "VPS en Hetzner FSN1" | conocida por el operador                   |
-| Sistema operativo            | "Debian 13.7 Trixie"                                                | `cat /etc/os-release`                      |
+| Sistema operativo            | "Debian 13.8 Trixie"                                                | `cat /etc/os-release`                      |
 | IP de gestión                | `192.168.1.10/24`                                                   | `ip -brief address`                        |
 | Puerto SSH                   | `17177`                                                             | `/etc/ssh/sshd_config.d/01-hardening.conf` |
 | Usuario administrativo       | `usuario`                                                           | manual                                     |
@@ -5318,6 +5250,79 @@ Ante una discrepancia, manda la página `man` del paquete instalado, que describ
 | Red | 7.5 | `interfaces(5)`, `systemd.network(5)` | — |
 
 Las direcciones son las del campo `Homepage` de cada paquete (`apt-cache show PAQUETE`); sin ella, la referencia es la página `man` y `/usr/share/doc/PAQUETE/`.
+
+## Historial de cambios
+
+- [0.13] – 2026-11-26
+  - Actualización de Debian 13.7 a 13.8, con las secciones 1 a 19 recorridas en una VM KVM instalada desde la ISO netinst.
+  - Pasos idempotentes: los respaldos `.ori` de 7.2 y 8.1 se hacen solo la primera vez, `52unattended-upgrades-local` se crea con `install` y lo que añaden 16.3, 16.4 y el correo de AIDE (14.3) solo se escribe si falta.
+  - Correcciones para la instalación desde ISO: `machine-id` frente al Product UUID (7.6), el `sources.list` que deja la netinst (8), el journal persistente (18.1), `PASS_MIN_LEN` ausente de `login.defs` (9.4) y el error de vsock aunque exista `/dev/vsock` (2.5.2).
+  - AIDE excluye `/run/dhcpcd`, advierte de los archivos de trabajo en `/root` y `/home`, aplica el correo después de la sección 20 y se regenera al cerrar la Etapa III; la plantilla `modprobe` pasa a v1.2 por la referencia al runbook (§22.3).
+  - Se redactan como variables el efecto de `libpam-pwquality` sobre faillock (9.4) y el índice de lynis (14.5), se amplían las sesiones que bloquean el reinicio automático (16.4) y los errores esperados del arranque (18.1.2), y el historial y el To-do pasan al final del manual.
+
+- [0.12] – 2026-11-20
+  - La §21.3.6 deja de ser un esquema pendiente y se divide en cuatro: cuenta de solo lectura con `rrsync -ro` y el grupo `borg-lectura` en el servidor (§21.3.6), copia del directorio `/var/backups/borg` completo en el servidor de respaldos con snapshots btrfs, límite de espacio y avisos por correo (§21.3.7), encendido por RTC y apagado tras la copia (§21.3.8) y copia manual en uno o varios discos externos con LUKS2 (§21.3.9).
+  - Las plantillas `01-hardening.conf` y `msmtprc` pasan a v1.4 y v1.3: en la v0.11 solo cambiaron las referencias a secciones de sus comentarios, y la versión sube para que un servidor desplegado con la anterior se distinga.
+  - El script de 21.3.5 devuelve la lectura del repositorio al grupo `borg-lectura` tras cada respaldo. La §21.1 admite un repositorio propio de un rol al lado del `<host>` y aclara que el servidor de respaldos no guarda las passphrases.
+  - 16.2 a 16.4: la configuración local de unattended-upgrades pasa a `52unattended-upgrades-local` y el `50` queda como lo instala el paquete; validado en un VPS. El aviso de 16.2 se corrige: el `50` no es un conffile de dpkg sino un archivo de `ucf`, que `debsums` no vigila.
+  - Sale del To-do la comprobación de `/etc/cron.d/staticroute`, que es del proveedor y no de Debian: el resultado, que el tráfico entre vecinos de una subred de Contabo sí depende de esa ruta y que el cron pierde la carrera con `systemd-networkd`, está en la sección 4 de [`proveedores/contabo.md`](proveedores/contabo.md), que pasa a v0.2 con lo aprendido al recorrerlo contra un segundo VPS: root bloqueada y consola VNC, restos de la imagen en `sshd_config`, el fallo de cloud-init en cada arranque, `kernel.panic` conservado, firewall compartido entre instancias, ping descartado, borrado de las credenciales de `cntb` y bloques de 6.2 y 6.3 validados tal como están escritos.
+
+- [0.11] – 2026-11-19
+  - Se intercambian las secciones 20 y 21: el reenvío de correo pasa a ser la §20 y los respaldos la §21; `bsd-mailx` sustituye a `mailutils` y msmtp añade su perfil de AppArmor y `from_full_name`.
+  - La §21 se reescribe con un repositorio Borg cifrado por servidor, grupos de activos como prefijo de los archivos, script con argumento y unidades plantilla, y un esquema 3-2-1 con copia traída por el servidor de respaldos.
+  - Se añaden el baneo permanente de direcciones (§11.7), `nftables` junto a fail2ban, NTS validado en chrony y el borrado de las copias de la contraseña inicial que deja cloud-init (§5.1).
+  - Se documentan efectos laterales observados: `UMASK 027` con debconf, `mail_badpass` sin correo con msmtp, `LoginGraceTime` y `PerSourcePenalties`, y el ruido de sysstat y `/tmp` en AIDE.
+- [0.10] – 2026-10-18
+  - Reorganización y renumeración: plantillas en §3, aprovisionamiento del proveedor en §5, firewall del proveedor en §11.6, diagnóstico como único anexo y referencias al final
+  - Lo propio de cada proveedor pasa a `proveedores/`, y la restricción a un CDN y el análisis de logs web al manual de Caddy. Se retiran rkhunter y las secciones redundantes
+  - Correcciones de fondo en PAM y faillock (§9.3.3), SSH (§10), auditd y AIDE (§14), AppArmor con auditd (§15.3), journald (§18) y msmtp (§21)
+- [0.9] – 2026-10-09
+  - El Anexo C de reenvío de correo con `msmtp` pasa a ser la sección 19 de la Etapa IV, y la documentación operativa pasa a ser la sección 20. Todas las referencias internas quedan renumeradas
+  - §9.6 reescrita: aviso de que no se ejecuta en el despliegue base, descarga de los rangos a un archivo con comprobación antes de tocar ninguna regla, retiro de las reglas abiertas por número y comprobación mensual de la lista publicada
+  - Nuevo Anexo C con el firewall del proveedor de nube, que es la capa que filtra antes de UFW y la única que alcanza a los puertos publicados por contenedores. Incluye el procedimiento para Azure
+  - §11.1, §11.3 y §12.4 advierten qué revisar cuando el rol del servidor incluye contenedores
+  - §14.2 aclara que los repositorios de terceros quedan fuera de las actualizaciones automáticas
+  - Anexo C: nueva C.4 con el firewall de VPS de Hostinger a través de su API, verificada en un despliegue detrás de un borde. La verificación desde fuera y el mantenimiento pasan a ser C.5 y C.6
+- [0.8] – 2026-09-24
+  - Cambio de la URL del manual y actualización de las URL de las plantillas
+- [0.7] – 2026-09-13
+  - Nueva §9.6 con la restricción del origen a los rangos de un proxy de borde o CDN
+  - Nueva §10.5 sobre los límites del modelo de baneo por IP frente a campañas distribuidas
+  - Nueva §16.5 sobre retención de logs frente a necesidad forense
+  - Nuevo Anexo B.11 con el análisis de logs de acceso en formato JSON
+- [0.6] – 2026-09-12
+  - Arreglos menores en la plantilla `/etc/hosts` del apartado §5.2
+  - Actualización de Debian 13.6 a 13.7
+  - Se retiran los checklists de cierre de todas las secciones
+  - Nueva §14.9 con el procedimiento posterior a un point release
+- [0.5] – 2026-07-24
+  - Modificación de las variables `ALLOW_SSH_ROOT_USER=unset` y `ALLOW_SSH_PROT_V1=2` en el apartado §12.2
+- [0.4] – 2026-07-14
+  - Actualización de Debian 13.5 a 13.6
+- [0.3] – 2026-05-20
+  - Seguridad: URLs de plantillas migradas a SHA anclado; nuevo hardening de sudo/pam_faillock; refuerzo SSH con   DisableForwarding; passphrase de Borg protegida con read -s.
+  - Correcciones: SystemMaxUse de journald reducido a 1 G; nota sobre PASS_MIN_LEN ignorado con pam_pwquality; variable $MIPUERTO_SMTP para evitar colisión; LUKS2/Argon2id/GRUB aclarado; sed de dropbear reemplazado por secuencia robusta; fixes de numeración y typo.
+  - Mejoras: nueva §12.6 con auditoría lynis; soporte NTS en chrony; pool NTP por país; nota de egreso en UFW; referencias cruzadas entre MTA, fail2ban y pam_faillock.
+- [0.2] – 2026-05-16
+  - Actualización de Debian 13.4 a 13.5
+  - Inclusión del override en C.6.1
+- [0.1] – 2026-04-28
+  - Manual terminado para la versión 13.4.0 de Debian
+
+## To-do
+
+- Nuevo manual de reenvío de logs a un servidor central con `systemd-journal-upload` y `systemd-journal-remote`
+- Evaluar y documentar CrowdSec como complemento o sustituto de fail2ban (§12.5). Requiere validación en entorno propio antes de escribirse como procedimiento: agente, escenarios, lista comunitaria y componente AppSec
+- Validar las copias de la sección 21.3.6 (servidor de respaldos y disco externo); la copia local, la automatización y la restauración se validaron en un VPS de Contabo el 2026-11-19
+- Inclusión de Ansible
+- Evaluar Forward Secure Sealing (FSS) del journal para servidores con requisitos de auditoría (§18.1.2)
+- Inclusión de Health Check, monitoreo y alerta, con uso de mensajería instantánea (Telegram) o correo electrónico
+- Verificar en entorno propio las órdenes de `az` de [`proveedores/azure.md`](proveedores/azure.md). Están tomadas de la referencia de la CLI de Azure y no de una corrida completa
+- Verificar en entorno propio las dos órdenes de [`proveedores/hostinger.md`](proveedores/hostinger.md) que no se han ejecutado contra la API de Hostinger: el alta de una regla con origen abierto y el borrado de una regla por su identificador
+- Documentar el filtrado de puertos publicados por contenedores en el propio host, para servidores sin firewall de proveedor (11.6.1)
+- Verificar sobre un servidor con contenedores la exclusión de AIDE de §14.3 y revisar el primer reporte diario posterior
+- Diseñar una arquitectura de respaldo 3-2-1, donde 2 sea una unidad de almacenamiento adicional cifrada y conectada al servidor para ejecutar respaldos periódicos; y 3 sea Borg en un repo externo al servidor
+- Auditar los servidores desplegados con versiones ≤ 0.9 de este manual (p. ej. `maracuya` y `arandano`): en el layout anterior de §9.3.3 las líneas de faillock iban debajo del bloque gestionado y `pam_deny` abortaba la pila antes del `preauth`, de modo que `pam_faillock` nunca contaba fallos. Se corrige aplicando la sección tal como está ahora
 
 ---
 
